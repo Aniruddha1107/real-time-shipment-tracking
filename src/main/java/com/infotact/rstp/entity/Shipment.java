@@ -53,6 +53,7 @@ public class Shipment {
     @JoinColumn(name = "awarded_carrier_id")
     private User awardedCarrier;
 
+    @Builder.Default
     @OneToMany(mappedBy = "shipment", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Bid> bids = new ArrayList<>();
 

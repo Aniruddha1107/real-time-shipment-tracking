@@ -17,8 +17,9 @@ public class TrackingEvent {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "shipment_id", nullable = false)
-    private Long shipmentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shipment_id", nullable = false)
+    private Shipment shipment;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "carrier_id", nullable = false)

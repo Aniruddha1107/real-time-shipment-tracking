@@ -39,10 +39,8 @@ jobs:
 
       - name: Build (skip tests)
   env:
-    DB_URL: jdbc:postgresql://localhost:5432/logistics_db
+    DB_URLS: jdbc:postgresql://localhost:5432/logistics_db
     DB_USERNAME: postgres
     DB_PASSWORD: postgres
     JWT_SECRET: Y2kteW91ci10ZXN0LXNlY3JldC1rZXktZm9yLWNpLXBpcGVsaW5lLXVzZS1vbmx5
   run: mvn clean install -Dmaven.test.skip=true --no-transfer-progress
-
-     

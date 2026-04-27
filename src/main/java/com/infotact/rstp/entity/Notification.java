@@ -21,9 +21,9 @@ public class Notification {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "shipment_id")
-    // 
-    private Long shipmentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shipment_id")
+    private Shipment shipment;
 
     @Column(nullable = false, length = 500)
     private String message;
