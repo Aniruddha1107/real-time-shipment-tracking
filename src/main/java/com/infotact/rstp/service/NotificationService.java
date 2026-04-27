@@ -1,9 +1,9 @@
 package com.infotact.rstp.service;
 
+import java.util.List;
+
 import com.infotact.rstp.dto.NotificationDTO;
 import com.infotact.rstp.entity.NotificationType;
-
-import java.util.List;
 
 public interface NotificationService {
     NotificationDTO createAndBroadcastNotification(Long userId, Long shipmentId, String message, NotificationType type);

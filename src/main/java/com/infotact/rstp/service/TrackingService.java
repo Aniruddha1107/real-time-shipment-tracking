@@ -1,7 +1,8 @@
 package com.infotact.rstp.service;
 
-import com.infotact.rstp.dto.TrackingEventDTO;
 import java.util.List;
+
+import com.infotact.rstp.dto.TrackingEventDTO;
 
 public interface TrackingService {
     TrackingEventDTO recordAndBroadcastEvent(TrackingEventDTO eventDto);

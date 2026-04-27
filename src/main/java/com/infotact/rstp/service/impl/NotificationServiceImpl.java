@@ -1,5 +1,12 @@
 package com.infotact.rstp.service.impl;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.infotact.rstp.dto.NotificationDTO;
 import com.infotact.rstp.entity.Notification;
 import com.infotact.rstp.entity.NotificationType;
@@ -9,13 +16,8 @@ import com.infotact.rstp.repository.NotificationRepository;
 import com.infotact.rstp.repository.ShipmentRepository;
 import com.infotact.rstp.repository.UserRepository;
 import com.infotact.rstp.service.NotificationService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
