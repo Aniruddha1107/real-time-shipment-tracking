@@ -32,9 +32,11 @@ public class User {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    @Builder.Default
     @OneToMany(mappedBy = "shipper", cascade = CascadeType.ALL)
     private List<Shipment> shipmentsPosted = new ArrayList<>();
 
+    @Builder.Default
     @OneToMany(mappedBy = "carrier", cascade = CascadeType.ALL)
     private List<Bid> bidsPlaced = new ArrayList<>();
     
