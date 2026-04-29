@@ -1,0 +1,82 @@
+/* Background */
+.login-container {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+}
+
+/* Card */
+.login-card {
+  background: #ffffff;
+  padding: 40px;
+  width: 350px;
+  border-radius: 12px;
+  box-shadow: 0px 8px 30px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+/* Heading */
+.login-card h2 {
+  margin-bottom: 5px;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* Subtitle */
+.subtitle {
+  color: #777;
+  margin-bottom: 20px;
+}
+
+/* Inputs */
+.login-card input,
+.login-card select {
+  width: 100%;
+  padding: 12px;
+  margin: 10px 0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  outline: none;
+  transition: 0.3s;
+}
+
+/* Input focus */
+.login-card input:focus,
+.login-card select:focus {
+  border-color: orange;
+  box-shadow: 0 0 5px rgba(255, 165, 0, 0.3);
+}
+
+/* Button */
+.login-card button {
+  width: 100%;
+  padding: 12px;
+  background: orange;
+  border: none;
+  color: white;
+  font-weight: bold;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: 0.3s;
+}
+
+/* Button hover */
+.login-card button:hover {
+  background: darkorange;
+}
+
+/* Link text */
+.link {
+  margin-top: 15px;
+  font-size: 14px;
+}
+
+/* Link highlight */
+.link span {
+  color: orange;
+  cursor: pointer;
+  font-weight: bold;
+}
