@@ -79,4 +79,62 @@
   color: orange;
   cursor: pointer;
   font-weight: bold;
+
+=======
+  text-decoration: none;
+}
+
+.error-msg {
+  color: #ff4d6d;
+  background: #ffe0e6;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.role-selector {
+  margin: 12px 0;
+  text-align: left;
+}
+
+.role-selector label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.role-options {
+  display: flex;
+  gap: 10px;
+}
+
+.role-btn {
+  flex: 1;
+  padding: 10px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  background: #fafafa;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.role-btn:hover {
+  border-color: orange;
+}
+
+.role-btn.active {
+  border-color: orange;
+  background: #fff5e6;
+  color: #e68a00;
+}
+
+.login-card button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+
 }
