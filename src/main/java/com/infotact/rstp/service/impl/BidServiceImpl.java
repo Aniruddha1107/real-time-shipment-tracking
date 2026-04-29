@@ -7,10 +7,12 @@ import com.infotact.rstp.entity.BidStatus;
 import com.infotact.rstp.entity.Shipment;
 import com.infotact.rstp.entity.ShipmentStatus;
 import com.infotact.rstp.entity.User;
+import com.infotact.rstp.entity.NotificationType;
 import com.infotact.rstp.repository.BidRepository;
 import com.infotact.rstp.repository.ShipmentRepository;
 import com.infotact.rstp.repository.UserRepository;
 import com.infotact.rstp.service.BidService;
+import com.infotact.rstp.service.NotificationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,13 +25,16 @@ public class BidServiceImpl implements BidService {
     private final BidRepository bidRepository;
     private final ShipmentRepository shipmentRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     public BidServiceImpl(BidRepository bidRepository,
-                          ShipmentRepository shipmentRepository,
-                          UserRepository userRepository) {
+            ShipmentRepository shipmentRepository,
+            UserRepository userRepository,
+            NotificationService notificationService) {
         this.bidRepository = bidRepository;
         this.shipmentRepository = shipmentRepository;
         this.userRepository = userRepository;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -54,6 +59,15 @@ public class BidServiceImpl implements BidService {
 
         Bid savedBid = bidRepository.save(bid);
         shipmentRepository.save(shipment);
+
+        notificationService.createAndBroadcastNotification(
+                shipment.getShipper().getId(),
+                shipment.getShipmentId(),
+                "New bid received from " + carrier.getName()
+                        + " for shipment ID: " + shipment.getShipmentId()
+                        + " with amount: " + savedBid.getBidAmount(),
+                NotificationType.BID_RECEIVED
+        );
 
         return mapToResponse(savedBid);
     }
@@ -102,6 +116,14 @@ public class BidServiceImpl implements BidService {
 
         bidRepository.saveAll(allBids);
         shipmentRepository.save(shipment);
+
+        notificationService.createAndBroadcastNotification(
+                lowestBid.getCarrier().getId(),
+                shipment.getShipmentId(),
+                "Congratulations! Your lowest bid has been accepted for shipment ID: "
+                        + shipment.getShipmentId(),
+                NotificationType.BID_AWARDED
+        );
 
         return mapToResponse(lowestBid);
     }
