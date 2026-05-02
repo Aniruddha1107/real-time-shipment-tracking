@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { loginUser, saveAuth } from "../services/api";
 import "./login.css";
 
 function Login() {
@@ -7,38 +8,22 @@ function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:8084/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      console.log("API RESPONSE:", data); // 🔍 DEBUG
-
-      if (res.ok) {
-        // ✅ FORCE STORE
-        localStorage.setItem("token", data.token || "test-token");
-        localStorage.setItem("email", email); // 🔥 IMPORTANT
-
-        console.log("Stored Email:", localStorage.getItem("email"));
-
-        navigate("/dashboard");
-      } else {
-        alert("Invalid credentials ❌");
-      }
-
+      const data = await loginUser(email, password);
+      saveAuth(data);
+      navigate("/dashboard");
     } catch (err) {
-      console.error(err);
-      alert("Server error ❌");
+      setError(err.message || "Login failed ❌");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -48,7 +33,9 @@ function Login() {
         <h2>Welcome Back</h2>
         <p className="subtitle">Login to your account</p>
 
-        <form onSubmit={handleLogin}>
+        {error && <p className="error-msg">{error}</p>}
+
+        <form onSubmit={handleSubmit}>
           <input
             type="email"
             placeholder="Enter Email"
@@ -65,7 +52,9 @@ function Login() {
             required
           />
 
-          <button type="submit">Login</button>
+          <button type="submit" disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
+          </button>
         </form>
 
         <p className="link">
