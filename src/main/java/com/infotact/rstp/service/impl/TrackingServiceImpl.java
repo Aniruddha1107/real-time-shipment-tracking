@@ -1,0 +1,80 @@
+package com.infotact.rstp.service.impl;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.infotact.rstp.dto.TrackingEventDTO;
+import com.infotact.rstp.entity.Shipment;
+import com.infotact.rstp.entity.TrackingEvent;
+import com.infotact.rstp.entity.User;
+import com.infotact.rstp.repository.ShipmentRepository;
+import com.infotact.rstp.repository.TrackingEventRepository;
+import com.infotact.rstp.repository.UserRepository;
+import com.infotact.rstp.service.TrackingService;
+
+import lombok.RequiredArgsConstructor;
+
+@Service
+@RequiredArgsConstructor
+public class TrackingServiceImpl implements TrackingService {
+
+    private final TrackingEventRepository trackingEventRepository;
+    private final ShipmentRepository shipmentRepository;
+    private final UserRepository userRepository;
+    private final SimpMessagingTemplate messagingTemplate;
+
+    @Override
+    @Transactional
+    public TrackingEventDTO recordAndBroadcastEvent(TrackingEventDTO eventDto) {
+        Shipment shipment = shipmentRepository.findById(eventDto.getShipmentId())
+                .orElseThrow(() -> new IllegalArgumentException("Shipment not found"));
+                
+        User carrier = userRepository.findById(eventDto.getCarrierId())
+                .orElseThrow(() -> new IllegalArgumentException("Carrier not found"));
+
+        TrackingEvent event = TrackingEvent.builder()
+                .shipment(shipment)
+                .carrier(carrier)
+                .latitude(eventDto.getLatitude())
+                .longitude(eventDto.getLongitude())
+                .locationDesc(eventDto.getLocationDesc())
+                .eventType(eventDto.getEventType())
+                .notes(eventDto.getNotes())
+                .build();
+
+        TrackingEvent savedEvent = trackingEventRepository.save(event);
+        
+        TrackingEventDTO savedDto = mapToDTO(savedEvent);
+
+        // Broadcast to the specific shipment's tracking topic
+        messagingTemplate.convertAndSend("/topic/tracking/" + shipment.getShipmentId(), savedDto);
+
+        return savedDto;
+    }
+
+    @Override
+    public List<TrackingEventDTO> getTrackingHistory(Long shipmentId) {
+        return trackingEventRepository.findByShipment_ShipmentIdOrderByEventTimestampDesc(shipmentId)
+                .stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    private TrackingEventDTO mapToDTO(TrackingEvent event) {
+        return TrackingEventDTO.builder()
+                .id(event.getId())
+                .shipmentId(event.getShipment().getShipmentId())
+                .carrierId(event.getCarrier().getId())
+                .latitude(event.getLatitude())
+                .longitude(event.getLongitude())
+                .locationDesc(event.getLocationDesc())
+                .eventType(event.getEventType())
+                .notes(event.getNotes())
+                .eventTimestamp(event.getEventTimestamp())
+                .build();
+    }
+}
