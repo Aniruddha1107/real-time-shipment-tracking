@@ -10,6 +10,8 @@ import com.infotact.rstp.exception.ResourceNotFoundException;
 import com.infotact.rstp.repository.ShipmentRepository;
 import com.infotact.rstp.repository.UserRepository;
 import com.infotact.rstp.service.ShipmentService;
+import com.infotact.rstp.exception.InvalidShipmentStatusException;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -84,6 +86,45 @@ public class ShipmentServiceImpl implements ShipmentService {
         shipment.setShipper(shipper);
 
         return mapToResponse(shipmentRepository.save(shipment));
+    }
+
+    @Override
+    @Transactional
+    public ShipmentResponse updateShipmentStatus(Long shipmentId, Long carrierId, ShipmentStatus newStatus) {
+
+        Shipment shipment = shipmentRepository.findById(shipmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shipment not found with id: " + shipmentId));
+
+        User carrier = userRepository.findById(carrierId)
+                .orElseThrow(() -> new ResourceNotFoundException("Carrier not found with id: " + carrierId));
+
+        if (carrier.getRole() != Role.CARRIER) {
+            throw new IllegalArgumentException("Only CARRIER users can update shipment status");
+        }
+
+        if (shipment.getAwardedCarrier() == null ||
+                !shipment.getAwardedCarrier().getId().equals(carrierId)) {
+            throw new IllegalArgumentException("Carrier is not awarded to this shipment");
+        }
+
+        validateStatusTransition(shipment.getStatus(), newStatus);
+
+        shipment.setStatus(newStatus);
+
+        return mapToResponse(shipmentRepository.save(shipment));
+    }
+
+    private void validateStatusTransition(ShipmentStatus currentStatus, ShipmentStatus newStatus) {
+        boolean validTransition =
+                (currentStatus == ShipmentStatus.AWARDED && newStatus == ShipmentStatus.AWAITING_PICKUP) ||
+                (currentStatus == ShipmentStatus.AWAITING_PICKUP && newStatus == ShipmentStatus.IN_TRANSIT) ||
+                (currentStatus == ShipmentStatus.IN_TRANSIT && newStatus == ShipmentStatus.DELIVERED);
+
+        if (!validTransition) {
+            throw new InvalidShipmentStatusException(
+                    "Invalid shipment status transition from " + currentStatus + " to " + newStatus
+            );
+        }
     }
 
     @Override
