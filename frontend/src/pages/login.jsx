@@ -1,6 +1,6 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { loginUser, saveAuth } from "../services/api";
+import { loginUser, saveAuth } from "../services/api"; // 🔥 use API
 import "./login.css";
 
 function Login() {
@@ -8,20 +8,29 @@ function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setError("");
-    setLoading(true);
 
     try {
+      setLoading(true);
+
+      // ✅ Backend API call
       const data = await loginUser(email, password);
+
+      console.log("LOGIN RESPONSE:", data); // debug
+
+      // ✅ IMPORTANT (fix)
       saveAuth(data);
+
+      alert("Login Successful ✅");
+
       navigate("/dashboard");
+
     } catch (err) {
-      setError(err.message || "Login failed ❌");
+      console.error(err);
+      alert(err.message || "Login Failed ❌");
     } finally {
       setLoading(false);
     }
@@ -33,9 +42,7 @@ function Login() {
         <h2>Welcome Back</h2>
         <p className="subtitle">Login to your account</p>
 
-        {error && <p className="error-msg">{error}</p>}
-
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleLogin}>
           <input
             type="email"
             placeholder="Enter Email"
@@ -59,7 +66,9 @@ function Login() {
 
         <p className="link">
           Don't have an account?{" "}
-          <span onClick={() => navigate("/register")}>Register</span>
+          <span onClick={() => navigate("/register")}>
+            Register
+          </span>
         </p>
       </div>
     </div>
