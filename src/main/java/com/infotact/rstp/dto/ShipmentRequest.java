@@ -13,6 +13,7 @@ public class ShipmentRequest {
     @NotBlank(message = "Title is required")
     private String title;
 
+    // ✅ Optional
     private String description;
 
     @NotBlank(message = "Origin is required")
@@ -25,6 +26,8 @@ public class ShipmentRequest {
     @Positive(message = "Weight must be greater than 0")
     private Double weight;
 
+    // ✅ Optional
+    @Positive(message = "Price must be greater than 0")
     private BigDecimal priceExpected;
 
     @NotNull(message = "Shipper ID is required")

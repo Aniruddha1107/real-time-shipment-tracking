@@ -23,11 +23,14 @@ public class ShipmentServiceImpl implements ShipmentService {
     private final ShipmentRepository shipmentRepository;
     private final UserRepository userRepository;
 
+    // ✅ CREATE SHIPMENT
     @Override
     public ShipmentResponse createShipment(ShipmentRequest request) {
 
         User shipper = userRepository.findById(request.getShipperId())
-                .orElseThrow(() -> new ResourceNotFoundException("Shipper not found"));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Shipper not found")
+                );
 
         if (shipper.getRole() != Role.SHIPPER) {
             throw new IllegalArgumentException("Only SHIPPER users allowed");
@@ -47,6 +50,7 @@ public class ShipmentServiceImpl implements ShipmentService {
         return mapToResponse(shipmentRepository.save(shipment));
     }
 
+    // ✅ ASSIGN CARRIER
     @Override
     public ShipmentResponse assignCarrier(Long shipmentId, Long carrierId) {
 
@@ -70,6 +74,7 @@ public class ShipmentServiceImpl implements ShipmentService {
         return mapToResponse(shipmentRepository.save(shipment));
     }
 
+    // ✅ GET ALL SHIPMENTS
     @Override
     public List<ShipmentResponse> getAllShipments() {
         return shipmentRepository.findAll()
@@ -78,6 +83,7 @@ public class ShipmentServiceImpl implements ShipmentService {
                 .toList();
     }
 
+    // ✅ DELETE SHIPMENT
     @Override
     public void deleteShipment(Long id) {
         Shipment shipment = shipmentRepository.findById(id)
@@ -88,7 +94,9 @@ public class ShipmentServiceImpl implements ShipmentService {
         shipmentRepository.delete(shipment);
     }
 
+    // ✅ RESPONSE MAPPER
     private ShipmentResponse mapToResponse(Shipment shipment) {
+
         return ShipmentResponse.builder()
                 .shipmentId(shipment.getShipmentId())
                 .title(shipment.getTitle())

@@ -1,78 +1,92 @@
-import { useNavigate } from "react-router-dom";
-import { logout, getRole, getUserId } from "../services/api";
-import { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  createShipment,
   getAllShipments,
-  assignCarrier
+  createShipment,
+  assignCarrier,
 } from "../services/api";
-import ShipmentCard from "../components/ShipmentCard";
 import "./dashboard.css";
 
-function Dashboard() {
-  const navigate = useNavigate();
-  const role = getRole();
-  const email = localStorage.getItem("email");
-  const username = email ? email.split("@")[0] : "User";
+const Dashboard = () => {
 
+  // ✅ STATES
   const [shipments, setShipments] = useState([]);
-  const [notifications, setNotifications] = useState([]);
 
-  const [form, setForm] = useState({
-    origin: "",
-    destination: "",
-    minPrice: "",
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      const saved = localStorage.getItem("notifications");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
 
-  // 🔥 Load Shipments
-  const loadShipments = async () => {
+  const [origin, setOrigin] = useState("");
+  const [destination, setDestination] = useState("");
+  const [price, setPrice] = useState("");
+
+  // ✅ FETCH SHIPMENTS
+  const fetchShipments = async () => {
     try {
       const data = await getAllShipments();
       setShipments(data);
     } catch (err) {
       console.error(err);
-      alert("Failed to load shipments ❌");
     }
   };
 
   useEffect(() => {
-    loadShipments();
+    fetchShipments();
   }, []);
 
-  // 🔐 Logout
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  // ✅ SAVE NOTIFICATIONS (LOCAL STORAGE)
+  useEffect(() => {
+    localStorage.setItem(
+      "notifications",
+      JSON.stringify(notifications)
+    );
+  }, [notifications]);
 
-  // 📦 Create Shipment
-  const handleCreateShipment = async (e) => {
-    e.preventDefault();
+  // ✅ CREATE SHIPMENT
+  const handleCreate = async () => {
+
+    if (!origin || !destination || !price) {
+      alert("Please fill all fields ❗");
+      return;
+    }
+
+    const userId = localStorage.getItem("userId");
+
+    if (!userId) {
+      alert("User not logged in ❌");
+      return;
+    }
 
     try {
-      const userId = getUserId();
-
       const payload = {
-        title: "Shipment",
-        description: "Created via dashboard",
-        origin: form.origin,
-        destination: form.destination,
+        title: `${origin} to ${destination}`,
+        description: "Created from dashboard",
+        origin: origin.trim(),
+        destination: destination.trim(),
         weight: 10,
-        priceExpected: Number(form.minPrice),
+        priceExpected: Number(price),
         shipperId: Number(userId),
       };
 
       await createShipment(payload);
 
-      setNotifications((prev) => [
-        ...prev,
-        `📦 Shipment created: ${form.origin} → ${form.destination}`,
+      // ✅ ADD NOTIFICATION (LATEST ON TOP)
+      setNotifications(prev => [
+        `📦 Shipment created: ${origin} → ${destination}`,
+        ...prev
       ]);
 
-      alert("Shipment Created ✅");
+      alert("Shipment created successfully ✅");
 
-      setForm({ origin: "", destination: "", minPrice: "" });
-      loadShipments();
+      setOrigin("");
+      setDestination("");
+      setPrice("");
+
+      fetchShipments();
 
     } catch (err) {
       console.error(err);
@@ -80,24 +94,24 @@ function Dashboard() {
     }
   };
 
-  // 🚚 Assign Carrier
-  const handleAssign = async (shipmentId) => {
-    console.log("Clicked:", shipmentId); // DEBUG
+  // ✅ ASSIGN CARRIER
+  const handleAssignCarrier = async (shipmentId) => {
 
-    const carrierId = prompt("Enter Carrier ID:");
-
+    const carrierId = prompt("Enter Carrier ID (e.g. 2)");
     if (!carrierId) return;
 
     try {
       await assignCarrier(shipmentId, carrierId);
 
-      setNotifications((prev) => [
-        ...prev,
-        `🚚 Carrier assigned to shipment ${shipmentId}`,
+      // ✅ ADD NOTIFICATION
+      setNotifications(prev => [
+        `🚚 Carrier ${carrierId} assigned to shipment ${shipmentId}`,
+        ...prev
       ]);
 
       alert("Carrier Assigned ✅");
-      loadShipments();
+
+      fetchShipments();
 
     } catch (err) {
       console.error(err);
@@ -109,99 +123,148 @@ function Dashboard() {
     <div className="dashboard-container">
 
       {/* HEADER */}
-      <header className="dashboard-header">
+      <div className="dashboard-header">
         <h1>📍 Shipment Tracking</h1>
 
         <div className="header-right">
-          <span className="user-info">
-            {email} <span className="role-badge">{role}</span>
+          <span>{localStorage.getItem("email")}</span>
+
+          <span className="role-badge">
+            {localStorage.getItem("role")}
           </span>
 
-          <button className="logout-btn" onClick={handleLogout}>
+          <button
+            className="logout-btn"
+            onClick={() => {
+              localStorage.clear();
+              window.location.href = "/login";
+            }}
+          >
             Logout
           </button>
         </div>
-      </header>
+      </div>
 
-      <main className="dashboard-main">
+      <div className="dashboard-main">
 
-        {/* Welcome */}
+        {/* WELCOME */}
         <div className="welcome-card">
-          <h2>Welcome {username} 👋</h2>
+          <h2>Welcome to your Dashboard 👋</h2>
+
           <p>
-            {role === "SHIPPER"
+            {localStorage.getItem("role") === "SHIPPER"
               ? "Create shipments and assign carriers."
-              : "View shipments and bid."}
+              : "View shipments and place bids."}
           </p>
         </div>
 
-        {/* Notifications */}
+        {/* 🔔 NOTIFICATIONS */}
         <div className="card">
-          <h3>🔔 Notifications</h3>
+          <h3>📦 Notifications</h3>
 
           {notifications.length === 0 ? (
-            <p>No notifications</p>
+            <p>No notifications yet</p>
           ) : (
-            notifications.map((n, i) => <p key={i}>{n}</p>)
+            notifications.map((n, index) => (
+              <p key={index}>👉 {n}</p>
+            ))
           )}
         </div>
 
-        {/* Create Shipment */}
-        {role === "SHIPPER" && (
+        {/* CREATE SHIPMENT (ONLY SHIPPER) */}
+        {localStorage.getItem("role") === "SHIPPER" && (
           <div className="card">
             <h3>Create Shipment</h3>
 
-            <form onSubmit={handleCreateShipment}>
+            <div className="form-row">
+
               <input
                 placeholder="Origin"
-                value={form.origin}
-                onChange={(e) =>
-                  setForm({ ...form, origin: e.target.value })
-                }
-                required
+                value={origin}
+                onChange={(e) => setOrigin(e.target.value)}
               />
 
               <input
                 placeholder="Destination"
-                value={form.destination}
-                onChange={(e) =>
-                  setForm({ ...form, destination: e.target.value })
-                }
-                required
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
               />
 
               <input
                 type="number"
                 placeholder="Minimum Price"
-                value={form.minPrice}
-                onChange={(e) =>
-                  setForm({ ...form, minPrice: e.target.value })
-                }
-                required
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
               />
 
-              <button type="submit">Create</button>
-            </form>
+              <button onClick={handleCreate}>
+                Create
+              </button>
+
+            </div>
           </div>
         )}
 
-        {/* Shipments */}
+        {/* SHIPMENTS */}
         <div className="card">
           <h3>📦 Shipments ({shipments.length})</h3>
 
+          {shipments.length === 0 && (
+            <p>No shipments yet 🚚</p>
+          )}
+
           {shipments.map((s) => (
-            <ShipmentCard
+            <div
               key={s.shipmentId}
-              shipment={s}
-              role={role}
-              onAssign={handleAssign}
-            />
+              className="shipment-card"
+            >
+
+              <h4>{s.origin} → {s.destination}</h4>
+
+              {/* ✅ STATUS COLOR */}
+              <p style={{
+                color: s.status === "OPEN" ? "orange" : "lightgreen"
+              }}>
+                Status: {s.status}
+              </p>
+
+              <p>Price: ₹{s.priceExpected}</p>
+
+              {/* ROLE BASED BUTTON */}
+              {localStorage.getItem("role") === "SHIPPER" ? (
+
+                <button
+                  className="assign-btn"
+                  onClick={() =>
+                    handleAssignCarrier(s.shipmentId)
+                  }
+                >
+                  Assign Carrier
+                </button>
+
+              ) : (
+
+                <button
+                  className="assign-btn"
+                  onClick={() => {
+                    const amount = prompt("Enter Bid Amount");
+                    if (!amount) return;
+
+                    alert(`Bid placed: ₹${amount}`);
+                  }}
+                >
+                  Place Bid
+                </button>
+
+              )}
+
+            </div>
           ))}
         </div>
 
-      </main>
+      </div>
     </div>
   );
-}
+};
 
 export default Dashboard;

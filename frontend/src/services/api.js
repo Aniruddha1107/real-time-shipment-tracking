@@ -1,46 +1,48 @@
 const BASE_URL = "http://localhost:8084";
 
-// ─── AUTH HELPERS ─────────────────────────────────────────
+// ─── AUTH STORAGE ─────────────────────────────
 
 export const saveAuth = (data) => {
+  console.log("🔥 SAVING AUTH:", data);
+
   localStorage.setItem("token", data.token);
   localStorage.setItem("role", data.role);
   localStorage.setItem("email", data.email);
 
-  // ✅ Optional (only if backend sends it)
-  if (data.userId) {
+  // ✅ SAFE CHECK (important)
+  if (data.userId !== undefined && data.userId !== null) {
     localStorage.setItem("userId", data.userId);
   }
 };
 
 export const getToken = () => localStorage.getItem("token");
-export const getRole = () => localStorage.getItem("role");
-export const getEmail = () => localStorage.getItem("email");
+
 export const getUserId = () => localStorage.getItem("userId");
 
-export const isLoggedIn = () => !!getToken();
+export const isLoggedIn = () => {
+  return !!localStorage.getItem("token");
+};
 
 export const logout = () => {
   localStorage.clear();
 };
 
-// ─── GENERIC REQUEST ──────────────────────────────────────
+// ─── COMMON REQUEST FUNCTION ───────────────────
 
 const request = async (method, path, body = null, auth = false) => {
   const headers = {
     "Content-Type": "application/json",
   };
 
-  // ✅ Add JWT only when needed
+  // ✅ Add token if needed
   if (auth) {
     const token = getToken();
-
-    if (!token) {
-      throw new Error("User not authenticated ❌");
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
-
-    headers["Authorization"] = `Bearer ${token}`;
   }
+
+  console.log("🔥 REQUEST:", method, path, body);
 
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
@@ -48,23 +50,28 @@ const request = async (method, path, body = null, auth = false) => {
     body: body ? JSON.stringify(body) : null,
   });
 
-  // ✅ Safe JSON parsing
   let data = {};
   try {
     data = await res.json();
-  } catch {
-    data = {};
+  } catch (err) {
+    console.log("⚠️ No JSON response");
   }
 
-  // ✅ Proper error handling
+  console.log("🔥 RESPONSE:", data);
+
+  // ❗ better error message
   if (!res.ok) {
-    throw new Error(data.message || `Error ${res.status}`);
+    throw new Error(
+      data.message ||
+      data.error ||
+      `Server Error ${res.status}`
+    );
   }
 
   return data;
 };
 
-// ─── AUTH API ─────────────────────────────────────────────
+// ─── AUTH APIs ────────────────────────────────
 
 export const loginUser = (email, password) =>
   request("POST", "/api/auth/login", { email, password });
@@ -77,17 +84,14 @@ export const registerUser = (name, email, password, role) =>
     role,
   });
 
-// ─── SHIPMENT API ─────────────────────────────────────────
+// ─── SHIPMENT APIs ────────────────────────────
 
-// ✅ Get all shipments
 export const getAllShipments = () =>
   request("GET", "/api/shipments", null, true);
 
-// ✅ Create shipment
 export const createShipment = (shipmentData) =>
   request("POST", "/api/shipments", shipmentData, true);
 
-// ✅ Assign carrier
 export const assignCarrier = (shipmentId, carrierId) =>
   request(
     "PUT",
@@ -96,18 +100,15 @@ export const assignCarrier = (shipmentId, carrierId) =>
     true
   );
 
-// ─── NOTIFICATIONS API ────────────────────────────────────
+// ─── NOTIFICATIONS ────────────────────────────
 
 export const getNotifications = (userId) =>
   request("GET", `/api/notifications/user/${userId}`, null, true);
 
-export const getUnreadNotifications = (userId) =>
-  request("GET", `/api/notifications/user/${userId}/unread`, null, true);
-
 export const markNotificationRead = (notificationId) =>
   request("PUT", `/api/notifications/${notificationId}/read`, null, true);
 
-// ─── TRACKING API ─────────────────────────────────────────
+// ─── TRACKING ────────────────────────────────
 
 export const getTrackingHistory = (shipmentId) =>
   request("GET", `/api/tracking/${shipmentId}`, null, true);
