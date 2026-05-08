@@ -2,10 +2,7 @@ package com.infotact.rstp.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.infotact.rstp.dto.AuthResponse;
 import com.infotact.rstp.dto.LoginRequest;
@@ -18,31 +15,39 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")   // ✅ FIX: "/" must be there
 @RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
 
     /**
-     * POST /auth/register
-     * Open to all — registers a new SHIPPER or CARRIER user and returns a JWT.
+     * REGISTER USER
+     * URL: POST http://localhost:8084/api/auth/register
      */
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<AuthResponse> register(
+            @Valid @RequestBody RegisterRequest request) {
+
         log.info("Register request received for: {}", request.getEmail());
+
         AuthResponse response = authService.register(request);
+
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
-     * POST /auth/login
-     * Open to all — authenticates credentials and returns a JWT.
+     * LOGIN USER
+     * URL: POST http://localhost:8084/api/auth/login
      */
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(
+            @Valid @RequestBody LoginRequest request) {
+
         log.info("Login request received for: {}", request.getEmail());
+
         AuthResponse response = authService.login(request);
+
         return ResponseEntity.ok(response);
     }
 }

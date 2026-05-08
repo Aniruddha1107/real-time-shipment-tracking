@@ -38,6 +38,17 @@ public class ShipmentController {
         return ResponseEntity.ok(shipmentService.getShipmentById(id));
     }
 
+    @PreAuthorize("hasRole('SHIPPER')")
+    @PutMapping("/{shipmentId}/assign/{carrierId}")
+    public ResponseEntity<ShipmentResponse> assignCarrier(
+            @PathVariable Long shipmentId,
+            @PathVariable Long carrierId) {
+
+        return ResponseEntity.ok(
+                shipmentService.assignCarrier(shipmentId, carrierId)
+        );
+    }
+
     @PreAuthorize("hasRole('CARRIER')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<ShipmentResponse> updateShipmentStatus(

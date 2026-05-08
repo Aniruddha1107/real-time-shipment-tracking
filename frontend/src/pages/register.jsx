@@ -1,49 +1,68 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { registerUser } from "../services/api";
 import "./login.css";
 
-function Register() {
-  const navigate = useNavigate();
-
+const Register = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("SHIPPER");
+
+  const navigate = useNavigate();
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+
+    try {
+      await registerUser(name, email, password, role);
+      alert("Registered successfully ✅");
+      navigate("/login");
+    } catch (err) {
+      alert("Registration failed ❌");
+    }
+  };
 
   return (
-    <div className="login-container">
-      <div className="login-card">
+    <div className="auth-container">
+      <form className="auth-card" onSubmit={handleRegister}>
         <h2>Create Account</h2>
-        <p className="subtitle">Register to get started</p>
+        <p>Register to get started</p>
 
         <input
           type="text"
-          placeholder="Enter Name"
-          value={name}
+          placeholder="Name"
           onChange={(e) => setName(e.target.value)}
+          required
         />
 
         <input
           type="email"
-          placeholder="Enter Email"
-          value={email}
+          placeholder="Email"
           onChange={(e) => setEmail(e.target.value)}
+          required
         />
 
         <input
           type="password"
-          placeholder="Enter Password"
-          value={password}
+          placeholder="Password"
           onChange={(e) => setPassword(e.target.value)}
+          required
         />
 
-        <button>Register</button>
+        <select onChange={(e) => setRole(e.target.value)}>
+          <option value="SHIPPER">SHIPPER</option>
+          <option value="CARRIER">CARRIER</option>
+        </select>
 
-        <p className="link">
-          Already have an account?{" "}
-          <span onClick={() => navigate("/login")}>Login</span>
+        <button type="submit">Register</button>
+
+        <p>
+          Already have an account? <Link to="/login">Login</Link>
         </p>
-      </div>
+      </form>
     </div>
   );
-}
+};
 
 export default Register;

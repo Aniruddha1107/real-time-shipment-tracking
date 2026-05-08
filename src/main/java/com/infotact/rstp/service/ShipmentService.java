@@ -8,6 +8,7 @@ import java.util.List;
 
 public interface ShipmentService {
     ShipmentResponse createShipment(ShipmentRequest request);
+    ShipmentResponse assignCarrier(Long shipmentId, Long carrierId);
     List<ShipmentResponse> getAllShipments();
     ShipmentResponse getShipmentById(Long id);
     ShipmentResponse updateShipment(Long id, ShipmentRequest request);

@@ -1,140 +1,48 @@
-/* Background */
-.login-container {
+.auth-container {
   height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+  background: #e9edf5;
 }
 
-/* Card */
-.login-card {
-  background: #ffffff;
-  padding: 40px;
-  width: 350px;
-  border-radius: 12px;
-  box-shadow: 0px 8px 30px rgba(0, 0, 0, 0.1);
+.auth-card {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  width: 320px;
   text-align: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
 
-/* Heading */
-.login-card h2 {
-  margin-bottom: 5px;
-  font-size: 24px;
-  font-weight: bold;
+.auth-card h2 {
+  margin-bottom: 10px;
 }
 
-/* Subtitle */
-.subtitle {
-  color: #777;
-  margin-bottom: 20px;
+.auth-card p {
+  color: gray;
+  font-size: 14px;
 }
 
-/* Inputs */
-.login-card input,
-.login-card select {
+.auth-card input {
   width: 100%;
-  padding: 12px;
   margin: 10px 0;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  outline: none;
-  transition: 0.3s;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
 }
 
-/* Input focus */
-.login-card input:focus,
-.login-card select:focus {
-  border-color: orange;
-  box-shadow: 0 0 5px rgba(255, 165, 0, 0.3);
-}
-
-/* Button */
-.login-card button {
+.auth-card button {
   width: 100%;
-  padding: 12px;
+  padding: 10px;
   background: orange;
   border: none;
   color: white;
   font-weight: bold;
-  border-radius: 6px;
+  border-radius: 5px;
   cursor: pointer;
-  margin-top: 10px;
-  transition: 0.3s;
 }
 
-/* Button hover */
-.login-card button:hover {
+.auth-card button:hover {
   background: darkorange;
-}
-
-/* Link text */
-.link {
-  margin-top: 15px;
-  font-size: 14px;
-}
-
-/* Link highlight */
-.link span {
-  color: orange;
-  cursor: pointer;
-  font-weight: bold;
-
-=======
-  text-decoration: none;
-}
-
-.error-msg {
-  color: #ff4d6d;
-  background: #ffe0e6;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  margin-bottom: 10px;
-}
-
-.role-selector {
-  margin: 12px 0;
-  text-align: left;
-}
-
-.role-selector label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #555;
-  display: block;
-  margin-bottom: 8px;
-}
-
-.role-options {
-  display: flex;
-  gap: 10px;
-}
-
-.role-btn {
-  flex: 1;
-  padding: 10px;
-  border: 2px solid #ddd;
-  border-radius: 8px;
-  background: #fafafa;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.role-btn:hover {
-  border-color: orange;
-}
-
-.role-btn.active {
-  border-color: orange;
-  background: #fff5e6;
-  color: #e68a00;
-}
-
-.login-card button:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-
 }
