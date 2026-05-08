@@ -53,8 +53,7 @@ public class SimulatedDriverService {
             try {
                 // We use recordAndBroadcastEvent which saves to DB and broadcasts via WebSockets
                 trackingService.recordAndBroadcastEvent(mockEvent);
-                log.debug("Simulated GPS Ping sent for shipment {}: [{}, {}]", 
-                          MOCK_ACTIVE_SHIPMENT_ID, currentLat, currentLng);
+                log.debug("Simulated GPS Ping sent for shipment {}: [{}, {}]", MOCK_ACTIVE_SHIPMENT_ID, currentLat, currentLng);
             } catch (Exception e) {
                 // If the shipment doesn't exist yet, just ignore the error during simulation
                 log.trace("Could not save simulated ping (Shipment might not exist yet)");
