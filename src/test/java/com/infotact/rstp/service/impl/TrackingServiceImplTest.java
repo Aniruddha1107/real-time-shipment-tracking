@@ -51,10 +51,12 @@ class TrackingServiceImplTest {
     @BeforeEach
     void setUp() {
         mockShipment = new Shipment();
-        mockShipment.setShipmentId(1L);
+    	mockShipment.setShipmentId(1L);
 
-        mockCarrier = new User();
-        mockCarrier.setId(2L);
+    	mockCarrier = new User();
+    	mockCarrier.setId(2L);
+
+    	mockShipment.setAwardedCarrier(mockCarrier);
 
         mockDto = TrackingEventDTO.builder()
                 .shipmentId(1L)
