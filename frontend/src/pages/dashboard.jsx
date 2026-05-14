@@ -1,267 +1,232 @@
-import React, { useEffect, useState } from "react";
-import {
-  getAllShipments,
-  createShipment,
-  assignCarrier,
-} from "../services/api";
+import React, { useEffect, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Package, 
+  Navigation, 
+  Bell, 
+  PlusCircle, 
+  LogOut, 
+  Truck, 
+  Map as MapIcon,
+  CheckCircle,
+  Clock
+} from "lucide-react";
+import { getAllShipments, createShipment, assignCarrier } from "../services/api";
+import websocketService from "../services/websocket";
+import TrackingMap from "../components/TrackingMap";
 import "./dashboard.css";
 
 const Dashboard = () => {
-
-  // ✅ STATES
   const [shipments, setShipments] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [activeTracking, setActiveTracking] = useState(null);
+  const [trackingData, setTrackingData] = useState({});
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newShipment, setNewShipment] = useState({ origin: "", destination: "", price: "" });
 
-  const [notifications, setNotifications] = useState(() => {
-    try {
-      const saved = localStorage.getItem("notifications");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const role = localStorage.getItem("role");
+  const userId = localStorage.getItem("userId");
+  const email = localStorage.getItem("email");
+  const token = localStorage.getItem("token");
 
-  const [origin, setOrigin] = useState("");
-  const [destination, setDestination] = useState("");
-  const [price, setPrice] = useState("");
-
-  // ✅ FETCH SHIPMENTS
-  const fetchShipments = async () => {
+  // ─── INITIAL FETCH ──────────────────────────────────
+  const fetchShipments = useCallback(async () => {
     try {
       const data = await getAllShipments();
       setShipments(data);
     } catch (err) {
-      console.error(err);
+      console.error("Fetch error:", err);
     }
-  };
-
-  useEffect(() => {
-    fetchShipments();
   }, []);
 
-  // ✅ SAVE NOTIFICATIONS (LOCAL STORAGE)
+  // ─── WEBSOCKET SETUP ────────────────────────────────
   useEffect(() => {
-    localStorage.setItem(
-      "notifications",
-      JSON.stringify(notifications)
-    );
-  }, [notifications]);
+    if (token) {
+      websocketService.connect(token);
+      
+      // Subscribe to global notifications
+      websocketService.subscribe('/topic/notifications', (msg) => {
+        setNotifications(prev => [{ id: Date.now(), ...msg }, ...prev].slice(0, 5));
+      });
 
-  // ✅ CREATE SHIPMENT
-  const handleCreate = async () => {
+      // Subscribe to personal notifications if userId exists
+      if (userId) {
+        websocketService.subscribe(`/topic/notifications/${userId}`, (msg) => {
+          setNotifications(prev => [{ id: Date.now(), ...msg }, ...prev].slice(0, 5));
+        });
+      }
+    }
 
-    if (!origin || !destination || !price) {
-      alert("Please fill all fields ❗");
+    fetchShipments();
+
+    return () => websocketService.disconnect();
+  }, [token, userId, fetchShipments]);
+
+  // ─── TRACKING SUBSCRIPTION ─────────────────────────
+  const startTracking = (shipmentId) => {
+    if (activeTracking === shipmentId) {
+      websocketService.unsubscribe(`/topic/tracking/${shipmentId}`);
+      setActiveTracking(null);
       return;
     }
 
-    const userId = localStorage.getItem("userId");
-
-    if (!userId) {
-      alert("User not logged in ❌");
-      return;
+    // Unsubscribe from previous if any
+    if (activeTracking) {
+      websocketService.unsubscribe(`/topic/tracking/${activeTracking}`);
     }
 
+    setActiveTracking(shipmentId);
+    websocketService.subscribe(`/topic/tracking/${shipmentId}`, (data) => {
+      setTrackingData(prev => ({ ...prev, [shipmentId]: data }));
+    });
+  };
+
+  // ─── HANDLERS ──────────────────────────────────────
+  const handleCreate = async (e) => {
+    e.preventDefault();
     try {
       const payload = {
-        title: `${origin} to ${destination}`,
-        description: "Created from dashboard",
-        origin: origin.trim(),
-        destination: destination.trim(),
-        weight: 10,
-        priceExpected: Number(price),
+        title: `${newShipment.origin} → ${newShipment.destination}`,
+        origin: newShipment.origin,
+        destination: newShipment.destination,
+        priceExpected: Number(newShipment.price),
         shipperId: Number(userId),
+        weight: 10,
+        status: "OPEN"
       };
-
       await createShipment(payload);
-
-      // ✅ ADD NOTIFICATION (LATEST ON TOP)
-      setNotifications(prev => [
-        `📦 Shipment created: ${origin} → ${destination}`,
-        ...prev
-      ]);
-
-      alert("Shipment created successfully ✅");
-
-      setOrigin("");
-      setDestination("");
-      setPrice("");
-
+      setIsCreateOpen(false);
+      setNewShipment({ origin: "", destination: "", price: "" });
       fetchShipments();
-
     } catch (err) {
-      console.error(err);
-      alert("Error creating shipment ❌");
+      alert("Failed to create shipment");
     }
   };
 
-  // ✅ ASSIGN CARRIER
-  const handleAssignCarrier = async (shipmentId) => {
-
-    const carrierId = prompt("Enter Carrier ID (e.g. 2)");
-    if (!carrierId) return;
-
-    try {
-      await assignCarrier(shipmentId, carrierId);
-
-      // ✅ ADD NOTIFICATION
-      setNotifications(prev => [
-        `🚚 Carrier ${carrierId} assigned to shipment ${shipmentId}`,
-        ...prev
-      ]);
-
-      alert("Carrier Assigned ✅");
-
-      fetchShipments();
-
-    } catch (err) {
-      console.error(err);
-      alert("Assign failed ❌");
-    }
+  const handleLogout = () => {
+    localStorage.clear();
+    window.location.href = "/login";
   };
 
   return (
-    <div className="dashboard-container">
-
-      {/* HEADER */}
-      <div className="dashboard-header">
-        <h1>📍 Shipment Tracking</h1>
-
-        <div className="header-right">
-          <span>{localStorage.getItem("email")}</span>
-
-          <span className="role-badge">
-            {localStorage.getItem("role")}
-          </span>
-
-          <button
-            className="logout-btn"
-            onClick={() => {
-              localStorage.clear();
-              window.location.href = "/login";
-            }}
-          >
-            Logout
-          </button>
+    <div className="dashboard-root">
+      {/* 🧭 NAVIGATION */}
+      <nav className="glass-nav">
+        <div className="nav-logo">
+          <Navigation className="logo-icon" />
+          <span>RSTP <small>Live</small></span>
         </div>
-      </div>
-
-      <div className="dashboard-main">
-
-        {/* WELCOME */}
-        <div className="welcome-card">
-          <h2>Welcome to your Dashboard 👋</h2>
-
-          <p>
-            {localStorage.getItem("role") === "SHIPPER"
-              ? "Create shipments and assign carriers."
-              : "View shipments and place bids."}
-          </p>
-        </div>
-
-        {/* 🔔 NOTIFICATIONS */}
-        <div className="card">
-          <h3>📦 Notifications</h3>
-
-          {notifications.length === 0 ? (
-            <p>No notifications yet</p>
-          ) : (
-            notifications.map((n, index) => (
-              <p key={index}>👉 {n}</p>
-            ))
-          )}
-        </div>
-
-        {/* CREATE SHIPMENT (ONLY SHIPPER) */}
-        {localStorage.getItem("role") === "SHIPPER" && (
-          <div className="card">
-            <h3>Create Shipment</h3>
-
-            <div className="form-row">
-
-              <input
-                placeholder="Origin"
-                value={origin}
-                onChange={(e) => setOrigin(e.target.value)}
-              />
-
-              <input
-                placeholder="Destination"
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-              />
-
-              <input
-                type="number"
-                placeholder="Minimum Price"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-              />
-
-              <button onClick={handleCreate}>
-                Create
-              </button>
-
-            </div>
+        <div className="nav-user">
+          <div className="user-meta">
+            <span className="user-email">{email}</span>
+            <span className="user-role">{role}</span>
           </div>
-        )}
-
-        {/* SHIPMENTS */}
-        <div className="card">
-          <h3>📦 Shipments ({shipments.length})</h3>
-
-          {shipments.length === 0 && (
-            <p>No shipments yet 🚚</p>
-          )}
-
-          {shipments.map((s) => (
-            <div
-              key={s.shipmentId}
-              className="shipment-card"
-            >
-
-              <h4>{s.origin} → {s.destination}</h4>
-
-              {/* ✅ STATUS COLOR */}
-              <p style={{
-                color: s.status === "OPEN" ? "orange" : "lightgreen"
-              }}>
-                Status: {s.status}
-              </p>
-
-              <p>Price: ₹{s.priceExpected}</p>
-
-              {/* ROLE BASED BUTTON */}
-              {localStorage.getItem("role") === "SHIPPER" ? (
-
-                <button
-                  className="assign-btn"
-                  onClick={() =>
-                    handleAssignCarrier(s.shipmentId)
-                  }
-                >
-                  Assign Carrier
-                </button>
-
-              ) : (
-
-                <button
-                  className="assign-btn"
-                  onClick={() => {
-                    const amount = prompt("Enter Bid Amount");
-                    if (!amount) return;
-
-                    alert(`Bid placed: ₹${amount}`);
-                  }}
-                >
-                  Place Bid
-                </button>
-
-              )}
-
-            </div>
-          ))}
+          <button onClick={handleLogout} className="icon-btn logout"><LogOut size={20} /></button>
         </div>
+      </nav>
 
+      <div className="dashboard-content">
+        {/* 📟 LEFT PANEL: SHIPMENTS */}
+        <aside className="shipments-panel">
+          <header className="panel-header">
+            <h3><Package size={20} /> My Shipments</h3>
+            {role === "SHIPPER" && (
+              <button onClick={() => setIsCreateOpen(!isCreateOpen)} className="add-btn">
+                <PlusCircle size={20} />
+              </button>
+            )}
+          </header>
+
+          <AnimatePresence>
+            {isCreateOpen && (
+              <motion.form 
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                onSubmit={handleCreate} 
+                className="create-form-card"
+              >
+                <input placeholder="Origin" value={newShipment.origin} onChange={e => setNewShipment({...newShipment, origin: e.target.value})} required />
+                <input placeholder="Destination" value={newShipment.destination} onChange={e => setNewShipment({...newShipment, destination: e.target.value})} required />
+                <input type="number" placeholder="Price (₹)" value={newShipment.price} onChange={e => setNewShipment({...newShipment, price: e.target.value})} required />
+                <button type="submit" className="submit-btn">Publish Shipment</button>
+              </motion.form>
+            )}
+          </AnimatePresence>
+
+          <div className="shipment-list">
+            {shipments.map((s) => (
+              <motion.div 
+                layout
+                key={s.shipmentId} 
+                className={`shipment-card ${activeTracking === s.shipmentId ? 'active' : ''}`}
+                onClick={() => startTracking(s.shipmentId)}
+              >
+                <div className="card-top">
+                  <span className={`status-pill ${s.status.toLowerCase()}`}>{s.status}</span>
+                  <span className="price-tag">₹{s.priceExpected}</span>
+                </div>
+                <h4>{s.origin} <Navigation size={14} className="arrow" /> {s.destination}</h4>
+                <div className="card-actions">
+                  <button className="track-btn">
+                    {activeTracking === s.shipmentId ? "Stop Tracking" : "Live Track"}
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </aside>
+
+        {/* 🗺️ CENTER PANEL: MAP */}
+        <main className="map-panel">
+          {activeTracking ? (
+            <div className="map-container-inner">
+              <TrackingMap 
+                latitude={trackingData[activeTracking]?.latitude}
+                longitude={trackingData[activeTracking]?.longitude}
+                locationDesc={trackingData[activeTracking]?.locationDesc}
+              />
+              <div className="tracking-overlay">
+                <div className="overlay-pill">
+                  <Clock size={16} /> 
+                  <span>Latest Update: {trackingData[activeTracking]?.eventTimestamp ? new Date(trackingData[activeTracking].eventTimestamp).toLocaleTimeString() : 'Waiting for pings...'}</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="map-placeholder">
+              <div className="placeholder-content">
+                <MapIcon size={64} />
+                <h2>Select a shipment to begin live tracking</h2>
+                <p>Real-time GPS updates will appear here once you select an active shipment.</p>
+              </div>
+            </div>
+          )}
+        </main>
+
+        {/* 🔔 RIGHT PANEL: NOTIFICATIONS */}
+        <aside className="notif-panel">
+          <header className="panel-header">
+            <h3><Bell size={20} /> Alerts</h3>
+          </header>
+          <div className="notif-list">
+            {notifications.map((n) => (
+              <motion.div 
+                initial={{ x: 50, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                key={n.id} 
+                className="notif-card"
+              >
+                <div className="notif-icon"><CheckCircle size={16} /></div>
+                <div className="notif-body">
+                  <p>{n.message || n.eventType}</p>
+                  <small>{new Date().toLocaleTimeString()}</small>
+                </div>
+              </motion.div>
+            ))}
+            {notifications.length === 0 && <p className="empty-msg">No recent activity</p>}
+          </div>
+        </aside>
       </div>
     </div>
   );
