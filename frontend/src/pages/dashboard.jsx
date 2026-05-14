@@ -6,13 +6,20 @@ import {
   Bell, 
   PlusCircle, 
   LogOut, 
-  Truck, 
   Map as MapIcon,
   CheckCircle,
   Clock,
-  Loader
+  Loader,
+  DollarSign,
+  Users
 } from "lucide-react";
-import { getAllShipments, createShipment, assignCarrier } from "../services/api";
+import { 
+  getAllShipments, 
+  createShipment, 
+  placeBid, 
+  getBidsByShipment, 
+  acceptLowestBid 
+} from "../services/api";
 import websocketService from "../services/websocket";
 import TrackingMap from "../components/TrackingMap";
 import "./dashboard.css";
@@ -25,6 +32,11 @@ const Dashboard = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newShipment, setNewShipment] = useState({ origin: "", destination: "", price: "" });
   const [loading, setLoading] = useState(true);
+
+  // Bidding State
+  const [bids, setBids] = useState({});
+  const [viewingBidsFor, setViewingBidsFor] = useState(null);
+  const [bidInputs, setBidInputs] = useState({}); // { shipmentId: amount }
 
   const role = localStorage.getItem("role") || "USER";
   const userId = localStorage.getItem("userId");
@@ -57,6 +69,8 @@ const Dashboard = () => {
         if (userId) {
           websocketService.subscribe(`/topic/notifications/${userId}`, (msg) => {
             setNotifications(prev => [{ id: Date.now(), message: msg.message || msg }, ...prev].slice(0, 5));
+            // Auto refresh shipments when a bid is accepted or tracking updates
+            fetchShipments();
           });
         }
       } catch (wsErr) {
@@ -74,7 +88,8 @@ const Dashboard = () => {
   }, [token, userId, fetchShipments]);
 
   // ─── TRACKING SUBSCRIPTION ─────────────────────────
-  const startTracking = (shipmentId) => {
+  const startTracking = (shipment) => {
+    const shipmentId = shipment.shipmentId;
     if (!shipmentId) return;
 
     if (activeTracking === shipmentId) {
@@ -88,13 +103,73 @@ const Dashboard = () => {
     }
 
     setActiveTracking(shipmentId);
+    setViewingBidsFor(null); // Close bids view when tracking
+    
+    // Set origin/dest for map routing
+    setTrackingData(prev => ({ 
+      ...prev, 
+      [shipmentId]: { 
+        ...prev[shipmentId], 
+        originStr: shipment.origin, 
+        destStr: shipment.destination 
+      } 
+    }));
+
     websocketService.subscribe(`/topic/tracking/${shipmentId}`, (data) => {
       if (data) {
-        setTrackingData(prev => ({ ...prev, [shipmentId]: data }));
+        setTrackingData(prev => ({ 
+          ...prev, 
+          [shipmentId]: { ...prev[shipmentId], ...data } 
+        }));
       }
     });
   };
 
+  // ─── BIDDING HANDLERS ──────────────────────────────
+  const handlePlaceBid = async (e, shipmentId) => {
+    e.stopPropagation();
+    const amount = bidInputs[shipmentId];
+    if (!amount) return;
+
+    try {
+      await placeBid(shipmentId, userId, amount, "Bid placed from dashboard");
+      alert(`Bid of ₹${amount} placed successfully!`);
+      setBidInputs(prev => ({ ...prev, [shipmentId]: "" }));
+    } catch (err) {
+      alert("Failed to place bid: " + err.message);
+    }
+  };
+
+  const loadBids = async (e, shipmentId) => {
+    e.stopPropagation();
+    if (viewingBidsFor === shipmentId) {
+      setViewingBidsFor(null);
+      return;
+    }
+    
+    try {
+      const data = await getBidsByShipment(shipmentId);
+      setBids(prev => ({ ...prev, [shipmentId]: data }));
+      setViewingBidsFor(shipmentId);
+      setActiveTracking(null); // Close tracking if opening bids
+    } catch (err) {
+      alert("Could not load bids: " + err.message);
+    }
+  };
+
+  const handleAcceptLowestBid = async (shipmentId) => {
+    if (!window.confirm("Accept the lowest bid?")) return;
+    try {
+      await acceptLowestBid(shipmentId);
+      alert("Lowest bid accepted! Shipment is now IN_TRANSIT.");
+      setViewingBidsFor(null);
+      fetchShipments();
+    } catch (err) {
+      alert("Failed to accept bid: " + err.message);
+    }
+  };
+
+  // ─── SHIPMENT HANDLERS ─────────────────────────────
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
@@ -173,18 +248,51 @@ const Dashboard = () => {
               <motion.div 
                 layout key={s.shipmentId} 
                 className={`shipment-card ${activeTracking === s.shipmentId ? 'active' : ''}`}
-                onClick={() => startTracking(s.shipmentId)}
+                onClick={() => startTracking(s)}
               >
                 <div className="card-top">
                   <span className={`status-pill ${(s.status || 'OPEN').toLowerCase()}`}>{s.status || 'OPEN'}</span>
                   <span className="price-tag">₹{s.priceExpected || 0}</span>
                 </div>
                 <h4>{s.origin || 'N/A'} <Navigation size={14} className="arrow" /> {s.destination || 'N/A'}</h4>
-                <div className="card-actions">
-                  <button className="track-btn">
-                    {activeTracking === s.shipmentId ? "Stop Tracking" : "Live Track"}
-                  </button>
+                
+                {/* ─── ACTION BUTTONS ─── */}
+                <div className="card-actions" style={{ marginTop: '1rem' }}>
+                  
+                  {/* Carrier Bidding Logic */}
+                  {role === "CARRIER" && s.status === "OPEN" && (
+                    <div className="bid-input-group" onClick={e => e.stopPropagation()}>
+                      <input 
+                        type="number" 
+                        placeholder="₹ Bid Amount" 
+                        value={bidInputs[s.shipmentId] || ""}
+                        onChange={e => setBidInputs({...bidInputs, [s.shipmentId]: e.target.value})}
+                      />
+                      <button className="bid-btn" onClick={(e) => handlePlaceBid(e, s.shipmentId)}>
+                        Place Bid
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Shipper Bidding Logic */}
+                  {role === "SHIPPER" && s.status === "OPEN" && (
+                    <button 
+                      className="view-bids-btn" 
+                      onClick={(e) => loadBids(e, s.shipmentId)}
+                    >
+                      <Users size={14} /> {viewingBidsFor === s.shipmentId ? "Hide Bids" : "View Bids"}
+                    </button>
+                  )}
+
+                  {/* Tracking Logic */}
+                  {s.status === "IN_TRANSIT" && (
+                    <button className="track-btn">
+                      <MapIcon size={14} style={{ marginRight: '4px' }}/> 
+                      {activeTracking === s.shipmentId ? "Stop Tracking" : "Live Track"}
+                    </button>
+                  )}
                 </div>
+
               </motion.div>
             ))}
             {!loading && shipments.length === 0 && <p className="empty-msg">No shipments found</p>}
@@ -192,12 +300,36 @@ const Dashboard = () => {
         </aside>
 
         <main className="map-panel">
-          {activeTracking ? (
+          {viewingBidsFor ? (
+            <div className="bids-view-panel">
+              <div className="bids-header">
+                <h2>Bids for Shipment #{viewingBidsFor}</h2>
+                <button className="accept-lowest-btn" onClick={() => handleAcceptLowestBid(viewingBidsFor)}>
+                  <DollarSign size={16} /> Accept Lowest Bid
+                </button>
+              </div>
+              <div className="bids-grid">
+                {bids[viewingBidsFor]?.length > 0 ? (
+                  bids[viewingBidsFor].map(bid => (
+                    <div key={bid.bidId} className="bid-card">
+                      <div className="bid-amount">₹{bid.bidPrice}</div>
+                      <div className="bid-carrier">Carrier ID: {bid.carrierId}</div>
+                      <div className="bid-message">"{bid.message}"</div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="no-bids">No bids received yet.</p>
+                )}
+              </div>
+            </div>
+          ) : activeTracking ? (
             <div className="map-container-inner">
               <TrackingMap 
                 latitude={trackingData[activeTracking]?.latitude}
                 longitude={trackingData[activeTracking]?.longitude}
                 locationDesc={trackingData[activeTracking]?.locationDesc}
+                originStr={trackingData[activeTracking]?.originStr}
+                destStr={trackingData[activeTracking]?.destStr}
               />
               <div className="tracking-overlay">
                 <div className="overlay-pill">

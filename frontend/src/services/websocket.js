@@ -6,10 +6,25 @@ class WebSocketService {
         this.client = null;
         this.subscriptions = new Map();
         this.onConnectCallbacks = [];
+        this.token = null;
+
+        // Auto-reconnect on network resume
+        window.addEventListener('online', () => {
+            console.log('Network online. Reconnecting STOMP...');
+            if (this.token && (!this.client || !this.client.connected)) {
+                this.connect(this.token);
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            console.log('Network offline. Disconnecting STOMP...');
+            this.disconnect(true);
+        });
     }
 
     connect(token) {
         if (this.client && this.client.connected) return;
+        this.token = token;
 
         const socket = new SockJS('http://localhost:8084/ws');
         this.client = new Client({
@@ -18,7 +33,7 @@ class WebSocketService {
                 'Authorization': `Bearer ${token}`
             },
             debug: (str) => {
-                console.log('STOMP: ' + str);
+                // console.log('STOMP: ' + str); // Disabled for cleaner logs
             },
             reconnectDelay: 5000,
             heartbeatIncoming: 4000,
@@ -26,8 +41,12 @@ class WebSocketService {
         });
 
         this.client.onConnect = (frame) => {
-            console.log('Connected to STOMP broker');
+            console.log('✅ Connected to STOMP broker');
             this.onConnectCallbacks.forEach(callback => callback(frame));
+        };
+
+        this.client.onWebSocketClose = () => {
+            console.warn('⚠️ WebSocket Closed. Attempting reconnect...');
         };
 
         this.client.onStompError = (frame) => {
@@ -45,11 +64,16 @@ class WebSocketService {
         }
 
         const subscribeFn = () => {
+            // Prevent duplicate subscriptions to the same topic
+            if (this.subscriptions.has(topic)) {
+                this.unsubscribe(topic);
+            }
+            
             const subscription = this.client.subscribe(topic, (message) => {
                 callback(JSON.parse(message.body));
             });
             this.subscriptions.set(topic, subscription);
-            console.log(`Subscribed to ${topic}`);
+            console.log(`📡 Subscribed to ${topic}`);
         };
 
         if (this.client.connected) {
@@ -64,7 +88,7 @@ class WebSocketService {
         if (subscription) {
             subscription.unsubscribe();
             this.subscriptions.delete(topic);
-            console.log(`Unsubscribed from ${topic}`);
+            console.log(`🔌 Unsubscribed from ${topic}`);
         }
     }
 
@@ -79,11 +103,14 @@ class WebSocketService {
         }
     }
 
-    disconnect() {
+    disconnect(isOfflineEvent = false) {
         if (this.client) {
             this.client.deactivate();
-            this.subscriptions.clear();
-            this.onConnectCallbacks = [];
+            if (!isOfflineEvent) {
+                this.subscriptions.clear();
+                this.onConnectCallbacks = [];
+                this.token = null;
+            }
             console.log('STOMP client deactivated');
         }
     }

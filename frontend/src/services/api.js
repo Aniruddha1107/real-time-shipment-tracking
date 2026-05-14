@@ -111,6 +111,15 @@ export const markNotificationRead = (notificationId) =>
   request("PUT", `/api/notifications/${notificationId}/read`, null, true);
 
 // ─── TRACKING ────────────────────────────────
-
 export const getTrackingHistory = (shipmentId) =>
   request("GET", `/api/tracking/${shipmentId}`, null, true);
+
+// ─── BIDDING ─────────────────────────────────
+export const placeBid = (shipmentId, carrierId, bidPrice, message = "") =>
+  request("POST", "/api/bids", { shipmentId, carrierId, bidPrice, message }, true);
+
+export const getBidsByShipment = (shipmentId) =>
+  request("GET", `/api/bids/shipment/${shipmentId}`, null, true);
+
+export const acceptLowestBid = (shipmentId) =>
+  request("PUT", `/api/bids/shipment/${shipmentId}/accept-lowest`, null, true);
