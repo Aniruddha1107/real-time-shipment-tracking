@@ -393,3 +393,56 @@
   .shipments-panel, .notif-panel { border: none; height: 500px; }
   .map-panel { height: 400px; }
 }
+
+.shipment-card button:hover {
+  background: #4f46e5;
+}
+
+/* NOTIFICATIONS */
+.notifications-section {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.notif-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.notif-item {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #cbd5e1;
+  border-left: 3px solid #f59e0b;
+}
+
+.empty-msg {
+  color: #64748b;
+  font-style: italic;
+}
+
+/* SHIPMENT LIST */
+.shipments-grid h3 {
+  color: white;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shipment-status span {
+  color: #f59e0b;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* RESPONSIVE FORM */
+@media (max-width: 600px) {
+  .form-row {
+    flex-direction: column;
+  }
+}

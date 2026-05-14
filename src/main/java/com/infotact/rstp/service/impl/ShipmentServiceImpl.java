@@ -145,9 +145,33 @@ public class ShipmentServiceImpl implements ShipmentService {
             throw new IllegalArgumentException("Carrier is not awarded to this shipment");
         }
 
+        validateStatusTransition(shipment.getStatus(), status);
         shipment.setStatus(status);
 
         return mapToResponse(shipmentRepository.save(shipment));
+    }
+
+    private void validateStatusTransition(ShipmentStatus currentStatus, ShipmentStatus newStatus) {
+
+        if (currentStatus == ShipmentStatus.AWAITING_PICKUP && newStatus == ShipmentStatus.IN_TRANSIT) {
+            return;
+        }
+
+        if (currentStatus == ShipmentStatus.IN_TRANSIT && newStatus == ShipmentStatus.DELIVERED) {
+            return;
+        }
+
+        throw new IllegalArgumentException(
+                "Invalid shipment status transition from " + currentStatus + " to " + newStatus
+        );
+    }
+
+    @Override
+    public List<ShipmentResponse> getAvailableShipments() {
+        return shipmentRepository.findByStatus(ShipmentStatus.OPEN)
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
     }
 
     // ✅ RESPONSE MAPPER

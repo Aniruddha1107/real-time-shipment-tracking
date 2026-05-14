@@ -36,6 +36,11 @@ public class TrackingServiceImpl implements TrackingService {
         User carrier = userRepository.findById(eventDto.getCarrierId())
                 .orElseThrow(() -> new IllegalArgumentException("Carrier not found"));
 
+        if (shipment.getAwardedCarrier() == null ||
+                !shipment.getAwardedCarrier().getId().equals(carrier.getId())) {
+            throw new IllegalArgumentException("Carrier is not awarded to this shipment");
+        }
+
         TrackingEvent event = TrackingEvent.builder()
                 .shipment(shipment)
                 .carrier(carrier)

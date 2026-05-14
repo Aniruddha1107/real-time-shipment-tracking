@@ -5,6 +5,7 @@ import com.infotact.rstp.dto.BidResponse;
 import com.infotact.rstp.service.BidService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -19,6 +20,7 @@ public class BidController {
         this.bidService = bidService;
     }
 
+    @PreAuthorize("hasRole('CARRIER')")
     @PostMapping
     public BidResponse placeBid(@Valid @RequestBody BidRequest request) {
         return bidService.placeBid(request);
@@ -34,6 +36,7 @@ public class BidController {
         return bidService.getBidsByCarrier(carrierId);
     }
 
+    @PreAuthorize("hasRole('SHIPPER')")
     @PutMapping("/shipment/{shipmentId}/accept-lowest")
     public BidResponse acceptLowestBid(@PathVariable Long shipmentId) {
         return bidService.acceptLowestBid(shipmentId);

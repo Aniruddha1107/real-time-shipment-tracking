@@ -60,6 +60,12 @@ public class ShipmentController {
         );
     }
 
+    @PreAuthorize("hasRole('CARRIER')")
+    @GetMapping("/available")
+    public ResponseEntity<List<ShipmentResponse>> getAvailableShipments() {
+        return ResponseEntity.ok(shipmentService.getAvailableShipments());
+    }
+
     @PreAuthorize("hasRole('SHIPPER')")
     @PutMapping("/{id}")
     public ResponseEntity<ShipmentResponse> updateShipment(@PathVariable Long id,

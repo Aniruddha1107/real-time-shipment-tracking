@@ -67,7 +67,7 @@ class BidServiceImplTest {
 
         assertEquals(BidStatus.ACCEPTED, lowestBid.getStatus());
         assertEquals(BidStatus.REJECTED, higherBid.getStatus());
-        assertEquals(ShipmentStatus.AWARDED, shipment.getStatus());
+        assertEquals(ShipmentStatus.AWAITING_PICKUP, shipment.getStatus());
         assertEquals(carrier1, shipment.getAwardedCarrier());
         assertEquals(new BigDecimal("500"), shipment.getAcceptedBidAmount());
         assertEquals(100L, response.getBidId());

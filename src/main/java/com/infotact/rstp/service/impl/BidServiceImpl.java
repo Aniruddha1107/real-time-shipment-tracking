@@ -112,7 +112,7 @@ public class BidServiceImpl implements BidService {
         Shipment shipment = lowestBid.getShipment();
         shipment.setAwardedCarrier(lowestBid.getCarrier());
         shipment.setAcceptedBidAmount(lowestBid.getBidAmount());
-        shipment.setStatus(ShipmentStatus.AWARDED);
+        shipment.setStatus(ShipmentStatus.AWAITING_PICKUP);
 
         bidRepository.saveAll(allBids);
         shipmentRepository.save(shipment);
