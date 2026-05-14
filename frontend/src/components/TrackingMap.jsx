@@ -1,18 +1,32 @@
-import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, FeatureGroup } from 'react-leaflet';
+import React, { useEffect, useMemo, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { geocodeLocation, getKnownCoordinates } from '../utils/geocoding';
 
-// Fix for default marker icons using CDN links
-const defaultIcon = new L.Icon({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
+const makeLabelIcon = (label, color) => L.divIcon({
+    className: '',
+    html: `
+        <div style="
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: ${color};
+            color: white;
+            display: grid;
+            place-items: center;
+            font-weight: 800;
+            border: 3px solid white;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.28);
+        ">${label}</div>
+    `,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -18]
 });
+
+const originIcon = makeLabelIcon('S', '#16a34a');
+const destinationIcon = makeLabelIcon('E', '#dc2626');
 
 // Truck icon for the shipment
 const truckIcon = new L.Icon({
@@ -22,27 +36,7 @@ const truckIcon = new L.Icon({
     popupAnchor: [0, -40]
 });
 
-// Mock Geocoder for Demo Purposes
-const MOCK_COORDS = {
-    'new york': [40.7128, -74.0060],
-    'los angeles': [34.0522, -118.2437],
-    'chicago': [41.8781, -87.6298],
-    'houston': [29.7604, -95.3698],
-    'mumbai': [19.0760, 72.8777],
-    'delhi': [28.7041, 77.1025],
-    'bangalore': [12.9716, 77.5946],
-    'hyderabad': [17.3850, 78.4867],
-    'salapur': [17.6599, 75.9064],
-    'pune': [18.5204, 73.8567],
-    'begampet': [17.4447, 78.4664],
-    'nampalli': [17.3847, 78.4682]
-};
-
-export const getCoordinates = (cityStr) => {
-    if (!cityStr || typeof cityStr !== 'string') return null;
-    const key = cityStr.toLowerCase().split(',')[0].trim();
-    return MOCK_COORDS[key] || null;
-};
+export const getCoordinates = getKnownCoordinates;
 
 function ChangeView({ center, bounds }) {
     const map = useMap();
@@ -57,13 +51,38 @@ function ChangeView({ center, bounds }) {
 }
 
 const TrackingMap = ({ latitude, longitude, locationDesc, originStr, destStr }) => {
-    // Current Live Position
-    const position = latitude && longitude ? [latitude, longitude] : null;
+    const [originCoords, setOriginCoords] = useState(() => getKnownCoordinates(originStr));
+    const [destCoords, setDestCoords] = useState(() => getKnownCoordinates(destStr));
+    const [geocodeStatus, setGeocodeStatus] = useState('');
 
-    // Route calculation
-    const originCoords = getCoordinates(originStr);
-    const destCoords = getCoordinates(destStr);
-    const routeCoordinates = originCoords && destCoords ? [originCoords, destCoords] : [];
+    useEffect(() => {
+        let isMounted = true;
+        setOriginCoords(getKnownCoordinates(originStr));
+        setDestCoords(getKnownCoordinates(destStr));
+        setGeocodeStatus('Resolving route points...');
+
+        Promise.all([geocodeLocation(originStr), geocodeLocation(destStr)])
+            .then(([origin, destination]) => {
+                if (!isMounted) return;
+                setOriginCoords(origin);
+                setDestCoords(destination);
+                setGeocodeStatus(origin && destination ? '' : 'Could not resolve one or more route points');
+            })
+            .catch(() => {
+                if (isMounted) setGeocodeStatus('Could not resolve route points');
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [originStr, destStr]);
+
+    const routeCoordinates = useMemo(
+        () => originCoords && destCoords ? [originCoords, destCoords] : [],
+        [originCoords, destCoords]
+    );
+    const hasLivePosition = latitude !== null && latitude !== undefined && longitude !== null && longitude !== undefined;
+    const position = hasLivePosition ? [Number(latitude), Number(longitude)] : originCoords;
 
     const [osrmRoute, setOsrmRoute] = useState([]);
 
@@ -91,11 +110,10 @@ const TrackingMap = ({ latitude, longitude, locationDesc, originStr, destStr }) 
         } else {
             setOsrmRoute([]);
         }
-    }, [originStr, destStr]);
+    }, [routeCoordinates]);
 
-    // Map Center & Bounds logic
     const mapCenter = position || originCoords || [20.5937, 78.9629];
-    const mapBounds = routeCoordinates.length > 0 && !position ? routeCoordinates : null;
+    const mapBounds = routeCoordinates.length > 0 ? routeCoordinates.concat(position ? [position] : []) : null;
 
     return (
         <MapContainer 
@@ -114,27 +132,41 @@ const TrackingMap = ({ latitude, longitude, locationDesc, originStr, destStr }) 
             {osrmRoute.length > 0 ? <Polyline positions={osrmRoute} color="#6366f1" weight={4} dashArray="10, 10" /> : null}
             
             {routeCoordinates.length === 2 ? (
-                <Marker position={originCoords} icon={defaultIcon}>
-                    <Popup><span>Origin: {originStr}</span></Popup>
+                <Marker position={originCoords} icon={originIcon}>
+                    <Popup><span>Start: {originStr}</span></Popup>
                 </Marker>
             ) : null}
 
             {routeCoordinates.length === 2 ? (
-                <Marker position={destCoords} icon={defaultIcon}>
-                    <Popup><span>Destination: {destStr}</span></Popup>
+                <Marker position={destCoords} icon={destinationIcon}>
+                    <Popup><span>End: {destStr}</span></Popup>
                 </Marker>
             ) : null}
 
-            {/* Draw Live Truck */}
             {position ? (
                 <Marker position={position} icon={truckIcon}>
                     <Popup>
                         <div>
-                            <strong>Live Location</strong> <br />
-                            {locationDesc || 'In Transit'}
+                            <strong>{hasLivePosition ? 'Current Carrier Location' : 'Awaiting GPS at Start Point'}</strong> <br />
+                            {locationDesc || 'Carrier location will update here'}
                         </div>
                     </Popup>
                 </Marker>
+            ) : null}
+
+            {geocodeStatus ? (
+                <div className="leaflet-top leaflet-left" style={{ marginTop: 10, marginLeft: 50 }}>
+                    <div className="leaflet-control" style={{
+                        background: 'white',
+                        padding: '8px 10px',
+                        borderRadius: 6,
+                        boxShadow: '0 8px 20px rgba(15, 23, 42, 0.18)',
+                        fontSize: 13,
+                        fontWeight: 700
+                    }}>
+                        {geocodeStatus}
+                    </div>
+                </div>
             ) : null}
         </MapContainer>
     );

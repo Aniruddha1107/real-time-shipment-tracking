@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface BidRepository extends JpaRepository<Bid, Long> {
     List<Bid> findByShipmentShipmentId(Long shipmentId);
     List<Bid> findByCarrierId(Long carrierId);
+    Optional<Bid> findByBidIdAndShipmentShipmentId(Long bidId, Long shipmentId);
 
     Optional<Bid> findFirstByShipmentShipmentIdAndStatusOrderByBidAmountAsc(
             Long shipmentId,

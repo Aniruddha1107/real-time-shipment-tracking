@@ -30,6 +30,5 @@ public class ShipmentRequest {
     @Positive(message = "Price must be greater than 0")
     private BigDecimal priceExpected;
 
-    @NotNull(message = "Shipper ID is required")
     private Long shipperId;
 }

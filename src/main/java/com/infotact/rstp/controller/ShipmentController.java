@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,28 +25,34 @@ public class ShipmentController {
 
     @PreAuthorize("hasRole('SHIPPER')")
     @PostMapping
-    public ResponseEntity<ShipmentResponse> createShipment(@Valid @RequestBody ShipmentRequest request) {
-        return new ResponseEntity<>(shipmentService.createShipment(request), HttpStatus.CREATED);
+    public ResponseEntity<ShipmentResponse> createShipment(@Valid @RequestBody ShipmentRequest request,
+                                                           Authentication authentication) {
+        return new ResponseEntity<>(
+                shipmentService.createShipment(request, authentication.getName()),
+                HttpStatus.CREATED
+        );
     }
 
     @GetMapping
-    public ResponseEntity<List<ShipmentResponse>> getAllShipments() {
-        return ResponseEntity.ok(shipmentService.getAllShipments());
+    public ResponseEntity<List<ShipmentResponse>> getAllShipments(Authentication authentication) {
+        return ResponseEntity.ok(shipmentService.getShipmentsForUser(authentication.getName()));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ShipmentResponse> getShipmentById(@PathVariable Long id) {
-        return ResponseEntity.ok(shipmentService.getShipmentById(id));
+    public ResponseEntity<ShipmentResponse> getShipmentById(@PathVariable Long id,
+                                                            Authentication authentication) {
+        return ResponseEntity.ok(shipmentService.getShipmentById(id, authentication.getName()));
     }
 
     @PreAuthorize("hasRole('SHIPPER')")
     @PutMapping("/{shipmentId}/assign/{carrierId}")
     public ResponseEntity<ShipmentResponse> assignCarrier(
             @PathVariable Long shipmentId,
-            @PathVariable Long carrierId) {
+            @PathVariable Long carrierId,
+            Authentication authentication) {
 
         return ResponseEntity.ok(
-                shipmentService.assignCarrier(shipmentId, carrierId)
+                shipmentService.assignCarrier(shipmentId, carrierId, authentication.getName())
         );
     }
 
@@ -53,10 +60,11 @@ public class ShipmentController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<ShipmentResponse> updateShipmentStatus(
             @PathVariable Long id,
-            @Valid @RequestBody ShipmentStatusUpdateRequest request) {
+            @Valid @RequestBody ShipmentStatusUpdateRequest request,
+            Authentication authentication) {
 
         return ResponseEntity.ok(
-                shipmentService.updateShipmentStatus(id, request.getCarrierId(), request.getStatus())
+                shipmentService.updateShipmentStatus(id, request.getStatus(), authentication.getName())
         );
     }
 
@@ -69,14 +77,16 @@ public class ShipmentController {
     @PreAuthorize("hasRole('SHIPPER')")
     @PutMapping("/{id}")
     public ResponseEntity<ShipmentResponse> updateShipment(@PathVariable Long id,
-                                                           @Valid @RequestBody ShipmentRequest request) {
-        return ResponseEntity.ok(shipmentService.updateShipment(id, request));
+                                                           @Valid @RequestBody ShipmentRequest request,
+                                                           Authentication authentication) {
+        return ResponseEntity.ok(shipmentService.updateShipment(id, request, authentication.getName()));
     }
 
     @PreAuthorize("hasRole('SHIPPER')")
     @DeleteMapping("/{id}")
-    public ResponseEntity<String> deleteShipment(@PathVariable Long id) {
-        shipmentService.deleteShipment(id);
+    public ResponseEntity<String> deleteShipment(@PathVariable Long id,
+                                                 Authentication authentication) {
+        shipmentService.deleteShipment(id, authentication.getName());
         return ResponseEntity.ok("Shipment deleted successfully");
     }
 }

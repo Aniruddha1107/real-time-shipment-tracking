@@ -24,14 +24,13 @@ class WebSocketService {
 
     connect(token) {
         if (this.client && this.client.connected) return;
-        this.token = token;
+        this.token = token || null;
 
         const socket = new SockJS('http://localhost:8084/ws');
+        const connectHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
         this.client = new Client({
             webSocketFactory: () => socket,
-            connectHeaders: {
-                'Authorization': `Bearer ${token}`
-            },
+            connectHeaders,
             debug: (str) => {
                 // console.log('STOMP: ' + str); // Disabled for cleaner logs
             },

@@ -44,6 +44,8 @@ public class Shipment {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime estimatedDeliveryAt;
+    private LocalDateTime deliveredAt;
 
     @ManyToOne
     @JoinColumn(name = "shipper_id", nullable = false)

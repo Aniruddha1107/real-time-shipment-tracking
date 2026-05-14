@@ -20,10 +20,12 @@ import {
   placeBid, 
   getBidsByShipment, 
   acceptLowestBid,
+  acceptBid,
   updateShipmentStatus
 } from "../services/api";
 import websocketService from "../services/websocket";
 import TrackingMap from "../components/TrackingMap";
+import { geocodeLocation, getKnownCoordinates } from "../utils/geocoding";
 import "./dashboard.css";
 
 const Dashboard = () => {
@@ -64,12 +66,8 @@ const Dashboard = () => {
       try {
         websocketService.connect(token);
         
-        websocketService.subscribe('/topic/notifications', (msg) => {
-          setNotifications(prev => [{ id: Date.now(), message: msg.message || msg }, ...prev].slice(0, 5));
-        });
-
         if (userId) {
-          websocketService.subscribe(`/topic/notifications/${userId}`, (msg) => {
+          websocketService.subscribe(`/topic/user/${userId}`, (msg) => {
             setNotifications(prev => [{ id: Date.now(), message: msg.message || msg }, ...prev].slice(0, 5));
             // Auto refresh shipments when a bid is accepted or tracking updates
             fetchShipments();
@@ -106,6 +104,8 @@ const Dashboard = () => {
 
     setActiveTracking(shipmentId);
     setViewingBidsFor(null); // Close bids view when tracking
+
+    const originCoords = getKnownCoordinates(shipment.origin);
     
     // Set origin/dest for map routing
     setTrackingData(prev => ({ 
@@ -113,7 +113,10 @@ const Dashboard = () => {
       [shipmentId]: { 
         ...prev[shipmentId], 
         originStr: shipment.origin, 
-        destStr: shipment.destination 
+        destStr: shipment.destination,
+        latitude: prev[shipmentId]?.latitude ?? originCoords?.[0],
+        longitude: prev[shipmentId]?.longitude ?? originCoords?.[1],
+        locationDesc: prev[shipmentId]?.locationDesc ?? `Awaiting GPS from ${shipment.origin}`
       } 
     }));
 
@@ -127,6 +130,71 @@ const Dashboard = () => {
     });
   };
 
+  // ─── GPS SIMULATION EFFECT ─────────────────────────
+  useEffect(() => {
+    let interval;
+    if (activeTracking && role === "CARRIER") {
+        const activeShipment = shipments.find(s => s.shipmentId === activeTracking);
+        if (activeShipment && activeShipment.status === "IN_TRANSIT") {
+        let cancelled = false;
+        
+        const runSimulation = async () => {
+          const [originCoords, destCoords] = await Promise.all([
+            geocodeLocation(activeShipment.origin),
+            geocodeLocation(activeShipment.destination)
+          ]);
+
+          if (cancelled || !originCoords || !destCoords) return;
+
+          // Initialize simulated position
+          let currentLat = originCoords[0];
+          let currentLng = originCoords[1];
+          let step = 0;
+          const totalSteps = 20;
+
+          const latStep = (destCoords[0] - originCoords[0]) / totalSteps;
+          const lngStep = (destCoords[1] - originCoords[1]) / totalSteps;
+
+          interval = setInterval(() => {
+            if (step >= totalSteps) {
+              clearInterval(interval);
+              return;
+            }
+            
+            step++;
+            currentLat += latStep;
+            currentLng += lngStep;
+            
+            const payload = {
+              shipmentId: activeTracking,
+              carrierId: parseInt(userId),
+              latitude: currentLat,
+              longitude: currentLng,
+              locationDesc: `In Transit towards ${activeShipment.destination}...`,
+              eventType: "LOCATION_UPDATE",
+              eventTimestamp: new Date().toISOString()
+            };
+            
+            // Publish the fake GPS coordinates to the STOMP broker
+            websocketService.send('/app/tracking.update', payload);
+            console.log("📍 Published simulated GPS ping:", payload);
+          }, 4000); // Send ping every 4 seconds
+        };
+
+        runSimulation();
+
+        return () => {
+          cancelled = true;
+          if (interval) clearInterval(interval);
+        };
+      }
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [activeTracking, role, shipments]);
+
   // ─── BIDDING HANDLERS ──────────────────────────────
   const handlePlaceBid = async (e, shipmentId) => {
     e.stopPropagation();
@@ -134,7 +202,7 @@ const Dashboard = () => {
     if (!amount) return;
 
     try {
-      await placeBid(shipmentId, userId, amount, "Bid placed from dashboard");
+      await placeBid(shipmentId, amount, "Bid placed from dashboard");
       alert(`Bid of ₹${amount} placed successfully!`);
       setBidInputs(prev => ({ ...prev, [shipmentId]: "" }));
     } catch (err) {
@@ -163,7 +231,19 @@ const Dashboard = () => {
     if (!window.confirm("Accept the lowest bid?")) return;
     try {
       await acceptLowestBid(shipmentId);
-      alert("Lowest bid accepted! Shipment is now AWARDED.");
+      alert("Lowest bid accepted! Shipment is awaiting pickup.");
+      setViewingBidsFor(null);
+      fetchShipments();
+    } catch (err) {
+      alert("Failed to accept bid: " + err.message);
+    }
+  };
+
+  const handleAcceptBid = async (shipmentId, bidId) => {
+    if (!window.confirm("Accept this carrier bid?")) return;
+    try {
+      await acceptBid(shipmentId, bidId);
+      alert("Bid accepted! Shipment is awaiting pickup.");
       setViewingBidsFor(null);
       fetchShipments();
     } catch (err) {
@@ -175,11 +255,27 @@ const Dashboard = () => {
     e.stopPropagation();
     if (!window.confirm("Start this shipment and begin GPS tracking?")) return;
     try {
-      await updateShipmentStatus(shipmentId, userId, "IN_TRANSIT");
+      await updateShipmentStatus(shipmentId, "IN_TRANSIT");
       alert("Shipment started! It is now IN_TRANSIT.");
       fetchShipments();
     } catch (err) {
       alert("Failed to start shipment: " + err.message);
+    }
+  };
+
+  const handleEndShipment = async (e, shipmentId) => {
+    e.stopPropagation();
+    if (!window.confirm("Mark this shipment as DELIVERED?")) return;
+    try {
+      await updateShipmentStatus(shipmentId, "DELIVERED");
+      alert("Shipment Delivered successfully! 🎉");
+      if (activeTracking === shipmentId) {
+          websocketService.unsubscribe(`/topic/tracking/${shipmentId}`);
+          setActiveTracking(null);
+      }
+      fetchShipments();
+    } catch (err) {
+      alert("Failed to end shipment: " + err.message);
     }
   };
 
@@ -213,7 +309,6 @@ const Dashboard = () => {
       </div>
     );
   }
->>>>>>> Stashed changes
 
   return (
     <div className="dashboard-root">
@@ -276,7 +371,7 @@ const Dashboard = () => {
                 <div className="card-actions" style={{ marginTop: '1rem' }}>
                   
                   {/* Carrier Bidding Logic */}
-                  {role === "CARRIER" && s.status === "OPEN" && (
+                  {role === "CARRIER" && (s.status === "OPEN" || s.status === "BIDDING") && (
                     <div className="bid-input-group" onClick={e => e.stopPropagation()}>
                       <input 
                         type="number" 
@@ -291,7 +386,7 @@ const Dashboard = () => {
                   )}
 
                   {/* Shipper Bidding Logic */}
-                  {role === "SHIPPER" && s.status === "OPEN" && (
+                  {role === "SHIPPER" && (s.status === "OPEN" || s.status === "BIDDING") && (
                     <button 
                       className="view-bids-btn" 
                       onClick={(e) => loadBids(e, s.shipmentId)}
@@ -301,7 +396,7 @@ const Dashboard = () => {
                   )}
 
                   {/* Tracking Logic */}
-                  {role === "CARRIER" && s.status === "AWARDED" && (
+                  {role === "CARRIER" && s.status === "AWAITING_PICKUP" && String(s.awardedCarrierId) === String(userId) && (
                     <button 
                       className="track-btn" 
                       onClick={(e) => handleStartShipment(e, s.shipmentId)}
@@ -313,16 +408,30 @@ const Dashboard = () => {
                   )}
 
                   {s.status === "IN_TRANSIT" && (
-                    <button 
-                      className="track-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startTracking(s);
-                      }}
-                    >
-                      <MapIcon size={14} style={{ marginRight: '4px' }}/> 
-                      {activeTracking === s.shipmentId ? "Stop Tracking" : "Live Track"}
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        className="track-btn"
+                        style={{ flex: 1 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startTracking(s);
+                        }}
+                      >
+                        <MapIcon size={14} style={{ marginRight: '4px' }}/> 
+                        {activeTracking === s.shipmentId ? "Stop Tracking" : "Live Track"}
+                      </button>
+
+                      {role === "CARRIER" && (
+                        <button 
+                          className="track-btn"
+                          style={{ flex: 1, borderColor: '#f59e0b', color: '#f59e0b' }}
+                          onClick={(e) => handleEndShipment(e, s.shipmentId)}
+                        >
+                          <CheckCircle size={14} style={{ marginRight: '4px' }}/> 
+                          Mark Delivered
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -348,6 +457,9 @@ const Dashboard = () => {
                       <div className="bid-amount">₹{bid.bidPrice}</div>
                       <div className="bid-carrier">Carrier ID: {bid.carrierId}</div>
                       <div className="bid-message">"{bid.message || 'No message'}"</div>
+                      <button className="accept-lowest-btn" onClick={() => handleAcceptBid(viewingBidsFor, bid.bidId)}>
+                        Accept Bid
+                      </button>
                     </div>
                   ))
                 ) : (
@@ -404,4 +516,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default Dashboard;

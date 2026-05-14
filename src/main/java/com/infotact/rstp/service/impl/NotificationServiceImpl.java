@@ -74,9 +74,12 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
-    public void markAsRead(Long notificationId) {
+    public void markAsRead(Long notificationId, Long userId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
+        if (!notification.getUser().getId().equals(userId)) {
+            throw new org.springframework.security.access.AccessDeniedException("You cannot update this notification");
+        }
         notification.setRead(true);
         notificationRepository.save(notification);
     }

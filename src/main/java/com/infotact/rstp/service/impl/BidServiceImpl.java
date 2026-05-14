@@ -8,11 +8,13 @@ import com.infotact.rstp.entity.Shipment;
 import com.infotact.rstp.entity.ShipmentStatus;
 import com.infotact.rstp.entity.User;
 import com.infotact.rstp.entity.NotificationType;
+import com.infotact.rstp.entity.Role;
 import com.infotact.rstp.repository.BidRepository;
 import com.infotact.rstp.repository.ShipmentRepository;
 import com.infotact.rstp.repository.UserRepository;
 import com.infotact.rstp.service.BidService;
 import com.infotact.rstp.service.NotificationService;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,13 +41,18 @@ public class BidServiceImpl implements BidService {
 
     @Override
     @Transactional
-    public BidResponse placeBid(BidRequest request) {
+    public BidResponse placeBid(BidRequest request, String carrierEmail) {
 
         Shipment shipment = shipmentRepository.findById(request.getShipmentId())
                 .orElseThrow(() -> new RuntimeException("Shipment not found with id: " + request.getShipmentId()));
 
-        User carrier = userRepository.findById(request.getCarrierId())
-                .orElseThrow(() -> new RuntimeException("Carrier not found with id: " + request.getCarrierId()));
+        User carrier = getUserByEmail(carrierEmail);
+        if (carrier.getRole() != Role.CARRIER) {
+            throw new IllegalArgumentException("Only carriers can place bids");
+        }
+        if (shipment.getStatus() != ShipmentStatus.OPEN && shipment.getStatus() != ShipmentStatus.BIDDING) {
+            throw new IllegalArgumentException("Shipment is not open for bidding");
+        }
 
         Bid bid = Bid.builder()
                 .shipment(shipment)
@@ -73,7 +80,11 @@ public class BidServiceImpl implements BidService {
     }
 
     @Override
-    public List<BidResponse> getBidsByShipment(Long shipmentId) {
+    public List<BidResponse> getBidsByShipment(Long shipmentId, String shipperEmail) {
+        Shipment shipment = shipmentRepository.findById(shipmentId)
+                .orElseThrow(() -> new RuntimeException("Shipment not found with id: " + shipmentId));
+        assertShipperOwnsShipment(shipment, shipperEmail);
+
         return bidRepository.findByShipmentShipmentId(shipmentId)
                 .stream()
                 .map(this::mapToResponse)
@@ -81,8 +92,13 @@ public class BidServiceImpl implements BidService {
     }
 
     @Override
-    public List<BidResponse> getBidsByCarrier(Long carrierId) {
-        return bidRepository.findByCarrierId(carrierId)
+    public List<BidResponse> getBidsByCarrier(String carrierEmail) {
+        User carrier = getUserByEmail(carrierEmail);
+        if (carrier.getRole() != Role.CARRIER) {
+            throw new IllegalArgumentException("Only carriers can view carrier bids");
+        }
+
+        return bidRepository.findByCarrierId(carrier.getId())
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -90,7 +106,7 @@ public class BidServiceImpl implements BidService {
 
     @Override
     @Transactional
-    public BidResponse acceptLowestBid(Long shipmentId) {
+    public BidResponse acceptLowestBid(Long shipmentId, String shipperEmail) {
 
         Bid lowestBid = bidRepository
                 .findFirstByShipmentShipmentIdAndStatusOrderByBidAmountAsc(
@@ -99,33 +115,67 @@ public class BidServiceImpl implements BidService {
                 )
                 .orElseThrow(() -> new RuntimeException("No pending bids found for shipment id: " + shipmentId));
 
+        assertShipperOwnsShipment(lowestBid.getShipment(), shipperEmail);
+
+        return acceptPendingBid(lowestBid);
+    }
+
+    @Override
+    @Transactional
+    public BidResponse acceptBid(Long shipmentId, Long bidId, String shipperEmail) {
+        Bid bidToAccept = bidRepository.findByBidIdAndShipmentShipmentId(bidId, shipmentId)
+                .orElseThrow(() -> new RuntimeException("Bid not found for shipment id: " + shipmentId));
+        if (bidToAccept.getStatus() != BidStatus.PENDING) {
+            throw new IllegalArgumentException("Only pending bids can be accepted");
+        }
+
+        assertShipperOwnsShipment(bidToAccept.getShipment(), shipperEmail);
+
+        return acceptPendingBid(bidToAccept);
+    }
+
+    private BidResponse acceptPendingBid(Bid acceptedBid) {
+        Long shipmentId = acceptedBid.getShipment().getShipmentId();
         List<Bid> allBids = bidRepository.findByShipmentShipmentId(shipmentId);
 
         for (Bid bid : allBids) {
-            if (bid.getBidId().equals(lowestBid.getBidId())) {
+            if (bid.getBidId().equals(acceptedBid.getBidId())) {
                 bid.setStatus(BidStatus.ACCEPTED);
             } else {
                 bid.setStatus(BidStatus.REJECTED);
             }
         }
 
-        Shipment shipment = lowestBid.getShipment();
-        shipment.setAwardedCarrier(lowestBid.getCarrier());
-        shipment.setAcceptedBidAmount(lowestBid.getBidAmount());
+        Shipment shipment = acceptedBid.getShipment();
+        shipment.setAwardedCarrier(acceptedBid.getCarrier());
+        shipment.setAcceptedBidAmount(acceptedBid.getBidAmount());
         shipment.setStatus(ShipmentStatus.AWAITING_PICKUP);
 
         bidRepository.saveAll(allBids);
         shipmentRepository.save(shipment);
 
         notificationService.createAndBroadcastNotification(
-                lowestBid.getCarrier().getId(),
+                acceptedBid.getCarrier().getId(),
                 shipment.getShipmentId(),
-                "Congratulations! Your lowest bid has been accepted for shipment ID: "
+                "Congratulations! Your bid has been accepted for shipment ID: "
                         + shipment.getShipmentId(),
                 NotificationType.BID_AWARDED
         );
 
-        return mapToResponse(lowestBid);
+        return mapToResponse(acceptedBid);
+    }
+
+    private User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    private void assertShipperOwnsShipment(Shipment shipment, String shipperEmail) {
+        User shipper = getUserByEmail(shipperEmail);
+        if (shipper.getRole() != Role.SHIPPER || shipment.getShipper() == null ||
+                !shipment.getShipper().getId().equals(shipper.getId())) {
+            throw new AccessDeniedException("You can only manage bids for your own shipments");
+        }
     }
 
     private BidResponse mapToResponse(Bid bid) {
