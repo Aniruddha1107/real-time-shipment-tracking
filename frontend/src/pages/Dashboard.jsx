@@ -24,7 +24,8 @@ import {
   updateShipmentStatus
 } from "../services/api";
 import websocketService from "../services/websocket";
-import TrackingMap, { getCoordinates } from "../components/TrackingMap";
+import TrackingMap from "../components/TrackingMap";
+import { geocodeLocation, getKnownCoordinates } from "../utils/geocoding";
 import "./dashboard.css";
 
 const Dashboard = () => {
@@ -104,7 +105,7 @@ const Dashboard = () => {
     setActiveTracking(shipmentId);
     setViewingBidsFor(null); // Close bids view when tracking
 
-    const originCoords = getCoordinates(shipment.origin);
+    const originCoords = getKnownCoordinates(shipment.origin);
     
     // Set origin/dest for map routing
     setTrackingData(prev => ({ 
@@ -133,12 +134,18 @@ const Dashboard = () => {
   useEffect(() => {
     let interval;
     if (activeTracking && role === "CARRIER") {
-      const activeShipment = shipments.find(s => s.shipmentId === activeTracking);
-      if (activeShipment && activeShipment.status === "IN_TRANSIT") {
-        const originCoords = getCoordinates(activeShipment.origin);
-        const destCoords = getCoordinates(activeShipment.destination);
+        const activeShipment = shipments.find(s => s.shipmentId === activeTracking);
+        if (activeShipment && activeShipment.status === "IN_TRANSIT") {
+        let cancelled = false;
         
-        if (originCoords && destCoords) {
+        const runSimulation = async () => {
+          const [originCoords, destCoords] = await Promise.all([
+            geocodeLocation(activeShipment.origin),
+            geocodeLocation(activeShipment.destination)
+          ]);
+
+          if (cancelled || !originCoords || !destCoords) return;
+
           // Initialize simulated position
           let currentLat = originCoords[0];
           let currentLng = originCoords[1];
@@ -172,7 +179,14 @@ const Dashboard = () => {
             websocketService.send('/app/tracking.update', payload);
             console.log("📍 Published simulated GPS ping:", payload);
           }, 4000); // Send ping every 4 seconds
-        }
+        };
+
+        runSimulation();
+
+        return () => {
+          cancelled = true;
+          if (interval) clearInterval(interval);
+        };
       }
     }
 

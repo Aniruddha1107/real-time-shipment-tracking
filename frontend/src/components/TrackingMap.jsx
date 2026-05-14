@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { geocodeLocation, getKnownCoordinates } from '../utils/geocoding';
 
 const makeLabelIcon = (label, color) => L.divIcon({
     className: '',
@@ -35,51 +36,7 @@ const truckIcon = new L.Icon({
     popupAnchor: [0, -40]
 });
 
-// Mock Geocoder for Demo Purposes
-const MOCK_COORDS = {
-    'new york': [40.7128, -74.0060],
-    'los angeles': [34.0522, -118.2437],
-    'chicago': [41.8781, -87.6298],
-    'houston': [29.7604, -95.3698],
-    'mumbai': [19.0760, 72.8777],
-    'delhi': [28.7041, 77.1025],
-    'bangalore': [12.9716, 77.5946],
-    'hyderabad': [17.3850, 78.4867],
-    'salapur': [17.6599, 75.9064],
-    'pune': [18.5204, 73.8567],
-    'begampet': [17.4447, 78.4664],
-    'nampalli': [17.3847, 78.4682]
-};
-
-const INDIA_BOUNDS = {
-    minLat: 8.4,
-    maxLat: 32.5,
-    minLng: 68.7,
-    maxLng: 88.2
-};
-
-const hashText = (text) => {
-    let hash = 0;
-    for (let i = 0; i < text.length; i += 1) {
-        hash = ((hash << 5) - hash) + text.charCodeAt(i);
-        hash |= 0;
-    }
-    return Math.abs(hash);
-};
-
-export const getCoordinates = (cityStr) => {
-    if (!cityStr || typeof cityStr !== 'string') return null;
-    const key = cityStr.toLowerCase().split(',')[0].trim();
-    if (MOCK_COORDS[key]) return MOCK_COORDS[key];
-
-    const hash = hashText(key);
-    const latRange = INDIA_BOUNDS.maxLat - INDIA_BOUNDS.minLat;
-    const lngRange = INDIA_BOUNDS.maxLng - INDIA_BOUNDS.minLng;
-    const latitude = INDIA_BOUNDS.minLat + ((hash % 10000) / 10000) * latRange;
-    const longitude = INDIA_BOUNDS.minLng + (((Math.floor(hash / 10000)) % 10000) / 10000) * lngRange;
-
-    return [Number(latitude.toFixed(4)), Number(longitude.toFixed(4))];
-};
+export const getCoordinates = getKnownCoordinates;
 
 function ChangeView({ center, bounds }) {
     const map = useMap();
@@ -94,8 +51,32 @@ function ChangeView({ center, bounds }) {
 }
 
 const TrackingMap = ({ latitude, longitude, locationDesc, originStr, destStr }) => {
-    const originCoords = useMemo(() => getCoordinates(originStr), [originStr]);
-    const destCoords = useMemo(() => getCoordinates(destStr), [destStr]);
+    const [originCoords, setOriginCoords] = useState(() => getKnownCoordinates(originStr));
+    const [destCoords, setDestCoords] = useState(() => getKnownCoordinates(destStr));
+    const [geocodeStatus, setGeocodeStatus] = useState('');
+
+    useEffect(() => {
+        let isMounted = true;
+        setOriginCoords(getKnownCoordinates(originStr));
+        setDestCoords(getKnownCoordinates(destStr));
+        setGeocodeStatus('Resolving route points...');
+
+        Promise.all([geocodeLocation(originStr), geocodeLocation(destStr)])
+            .then(([origin, destination]) => {
+                if (!isMounted) return;
+                setOriginCoords(origin);
+                setDestCoords(destination);
+                setGeocodeStatus(origin && destination ? '' : 'Could not resolve one or more route points');
+            })
+            .catch(() => {
+                if (isMounted) setGeocodeStatus('Could not resolve route points');
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [originStr, destStr]);
+
     const routeCoordinates = useMemo(
         () => originCoords && destCoords ? [originCoords, destCoords] : [],
         [originCoords, destCoords]
@@ -171,6 +152,21 @@ const TrackingMap = ({ latitude, longitude, locationDesc, originStr, destStr }) 
                         </div>
                     </Popup>
                 </Marker>
+            ) : null}
+
+            {geocodeStatus ? (
+                <div className="leaflet-top leaflet-left" style={{ marginTop: 10, marginLeft: 50 }}>
+                    <div className="leaflet-control" style={{
+                        background: 'white',
+                        padding: '8px 10px',
+                        borderRadius: 6,
+                        boxShadow: '0 8px 20px rgba(15, 23, 42, 0.18)',
+                        fontSize: 13,
+                        fontWeight: 700
+                    }}>
+                        {geocodeStatus}
+                    </div>
+                </div>
             ) : null}
         </MapContainer>
     );
