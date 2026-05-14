@@ -78,28 +78,32 @@ const TrackingMap = ({ latitude, longitude, locationDesc, originStr, destStr }) 
             
             <ChangeView center={mapCenter} bounds={mapBounds} />
 
-            {/* Draw Planned Route */}
-            {routeCoordinates.length === 2 && (
-                <FeatureGroup>
-                    <Polyline positions={routeCoordinates} color="#6366f1" weight={4} dashArray="10, 10" />
-                    <Marker position={originCoords} icon={defaultIcon}>
-                        <Popup>Origin: {originStr}</Popup>
-                    </Marker>
-                    <Marker position={destCoords} icon={defaultIcon}>
-                        <Popup>Destination: {destStr}</Popup>
-                    </Marker>
-                </FeatureGroup>
-            )}
+            {/* Draw Planned Route - Flattened completely to avoid FeatureGroup context bugs */}
+            {routeCoordinates.length === 2 ? <Polyline positions={routeCoordinates} color="#6366f1" weight={4} dashArray="10, 10" /> : null}
+            
+            {routeCoordinates.length === 2 ? (
+                <Marker position={originCoords} icon={defaultIcon}>
+                    <Popup><span>Origin: {originStr}</span></Popup>
+                </Marker>
+            ) : null}
+
+            {routeCoordinates.length === 2 ? (
+                <Marker position={destCoords} icon={defaultIcon}>
+                    <Popup><span>Destination: {destStr}</span></Popup>
+                </Marker>
+            ) : null}
 
             {/* Draw Live Truck */}
-            {position && (
+            {position ? (
                 <Marker position={position} icon={truckIcon}>
                     <Popup>
-                        <strong>Live Location</strong> <br />
-                        {locationDesc || 'In Transit'}
+                        <div>
+                            <strong>Live Location</strong> <br />
+                            {locationDesc || 'In Transit'}
+                        </div>
                     </Popup>
                 </Marker>
-            )}
+            ) : null}
         </MapContainer>
     );
 };
