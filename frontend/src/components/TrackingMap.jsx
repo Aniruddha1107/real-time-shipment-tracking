@@ -31,12 +31,16 @@ const MOCK_COORDS = {
     'mumbai': [19.0760, 72.8777],
     'delhi': [28.7041, 77.1025],
     'bangalore': [12.9716, 77.5946],
-    'hyderabad': [17.3850, 78.4867]
+    'hyderabad': [17.3850, 78.4867],
+    'salapur': [17.6599, 75.9064],
+    'pune': [18.5204, 73.8567],
+    'begampet': [17.4447, 78.4664],
+    'nampalli': [17.3847, 78.4682]
 };
 
-const getCoordinates = (cityStr) => {
+export const getCoordinates = (cityStr) => {
     if (!cityStr || typeof cityStr !== 'string') return null;
-    const key = cityStr.toLowerCase().trim();
+    const key = cityStr.toLowerCase().split(',')[0].trim();
     return MOCK_COORDS[key] || null;
 };
 
@@ -61,6 +65,34 @@ const TrackingMap = ({ latitude, longitude, locationDesc, originStr, destStr }) 
     const destCoords = getCoordinates(destStr);
     const routeCoordinates = originCoords && destCoords ? [originCoords, destCoords] : [];
 
+    const [osrmRoute, setOsrmRoute] = useState([]);
+
+    // Fetch realistic road route using OSRM
+    useEffect(() => {
+        if (routeCoordinates.length === 2) {
+            const fetchRoute = async () => {
+                try {
+                    const [lat1, lon1] = routeCoordinates[0];
+                    const [lat2, lon2] = routeCoordinates[1];
+                    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`);
+                    const data = await res.json();
+                    if (data.routes && data.routes.length > 0) {
+                        const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                        setOsrmRoute(coords);
+                    } else {
+                        setOsrmRoute(routeCoordinates);
+                    }
+                } catch (e) {
+                    console.error("OSRM Routing Error:", e);
+                    setOsrmRoute(routeCoordinates);
+                }
+            };
+            fetchRoute();
+        } else {
+            setOsrmRoute([]);
+        }
+    }, [originStr, destStr]);
+
     // Map Center & Bounds logic
     const mapCenter = position || originCoords || [20.5937, 78.9629];
     const mapBounds = routeCoordinates.length > 0 && !position ? routeCoordinates : null;
@@ -78,8 +110,8 @@ const TrackingMap = ({ latitude, longitude, locationDesc, originStr, destStr }) 
             
             <ChangeView center={mapCenter} bounds={mapBounds} />
 
-            {/* Draw Planned Route - Flattened completely to avoid FeatureGroup context bugs */}
-            {routeCoordinates.length === 2 ? <Polyline positions={routeCoordinates} color="#6366f1" weight={4} dashArray="10, 10" /> : null}
+            {/* Draw Planned Route - Uses realistic road geometries if available */}
+            {osrmRoute.length > 0 ? <Polyline positions={osrmRoute} color="#6366f1" weight={4} dashArray="10, 10" /> : null}
             
             {routeCoordinates.length === 2 ? (
                 <Marker position={originCoords} icon={defaultIcon}>
