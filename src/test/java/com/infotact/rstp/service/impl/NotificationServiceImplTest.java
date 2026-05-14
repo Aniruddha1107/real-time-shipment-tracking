@@ -111,7 +111,7 @@ class NotificationServiceImplTest {
         when(notificationRepository.save(any(Notification.class))).thenReturn(mockNotification);
 
         // Act
-        notificationService.markAsRead(10L);
+        notificationService.markAsRead(10L, 1L);
 
         // Assert
         assertTrue(mockNotification.isRead());

@@ -1,10 +1,10 @@
-name: CI — Build & Test
+name: CI - Build & Test
 
 on:
   push:
-    branches: [ dev ]
+    branches: [dev]
   pull_request:
-    branches: [ main, dev ]
+    branches: [main, dev]
 
 jobs:
   build:
@@ -26,6 +26,12 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+    env:
+      DB_URLS: jdbc:postgresql://localhost:5432/logistics_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      JWT_SECRET: Y2kteW91ci10ZXN0LXNlY3JldC1rZXktZm9yLWNpLXBpcGVsaW5lLXVzZS1vbmx5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,14 +39,9 @@ jobs:
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
+          java-version: "21"
+          distribution: temurin
           cache: maven
 
-      - name: Build (skip tests)
-  env:
-    DB_URLS: jdbc:postgresql://localhost:5432/logistics_db
-    DB_USERNAME: postgres
-    DB_PASSWORD: postgres
-    JWT_SECRET: Y2kteW91ci10ZXN0LXNlY3JldC1rZXktZm9yLWNpLXBpcGVsaW5lLXVzZS1vbmx5
-  run: mvn clean install -Dmaven.test.skip=true --no-transfer-progress
+      - name: Run Maven tests
+        run: mvn clean test --no-transfer-progress

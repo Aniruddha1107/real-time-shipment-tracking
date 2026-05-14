@@ -31,7 +31,7 @@ class BidServiceImplTest {
 
     @Test
     void acceptLowestBid_ShouldAcceptLowestBidAndRejectOthers() {
-        User shipper = User.builder().id(1L).name("Shipper").role(Role.SHIPPER).build();
+        User shipper = User.builder().id(1L).name("Shipper").email("shipper@test.com").role(Role.SHIPPER).build();
         User carrier1 = User.builder().id(2L).name("Carrier 1").role(Role.CARRIER).build();
         User carrier2 = User.builder().id(3L).name("Carrier 2").role(Role.CARRIER).build();
 
@@ -62,8 +62,10 @@ class BidServiceImplTest {
 
         when(bidRepository.findByShipmentShipmentId(10L))
                 .thenReturn(List.of(lowestBid, higherBid));
+        when(userRepository.findByEmail("shipper@test.com"))
+                .thenReturn(Optional.of(shipper));
 
-        BidResponse response = bidService.acceptLowestBid(10L);
+        BidResponse response = bidService.acceptLowestBid(10L, "shipper@test.com");
 
         assertEquals(BidStatus.ACCEPTED, lowestBid.getStatus());
         assertEquals(BidStatus.REJECTED, higherBid.getStatus());

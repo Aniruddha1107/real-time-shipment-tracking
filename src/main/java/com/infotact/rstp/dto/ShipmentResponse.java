@@ -22,6 +22,9 @@ public class ShipmentResponse {
     private String shipperName;
     private Long awardedCarrierId;
     private String awardedCarrierName;
+    private BigDecimal acceptedBidAmount;
+    private LocalDateTime estimatedDeliveryAt;
+    private LocalDateTime deliveredAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

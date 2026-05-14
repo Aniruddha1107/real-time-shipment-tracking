@@ -7,12 +7,13 @@ import com.infotact.rstp.entity.ShipmentStatus;
 import java.util.List;
 
 public interface ShipmentService {
-    ShipmentResponse createShipment(ShipmentRequest request);
-    ShipmentResponse assignCarrier(Long shipmentId, Long carrierId);
-    List<ShipmentResponse> getAllShipments();
+    ShipmentResponse createShipment(ShipmentRequest request, String shipperEmail);
+    ShipmentResponse assignCarrier(Long shipmentId, Long carrierId, String shipperEmail);
+    List<ShipmentResponse> getShipmentsForUser(String userEmail);
     List<ShipmentResponse> getAvailableShipments();
-    ShipmentResponse getShipmentById(Long id);
-    ShipmentResponse updateShipment(Long id, ShipmentRequest request);
-    ShipmentResponse updateShipmentStatus(Long shipmentId, Long carrierId, ShipmentStatus status);
-    void deleteShipment(Long id);
+    ShipmentResponse getShipmentById(Long id, String userEmail);
+    ShipmentResponse getPublicShipmentById(Long id);
+    ShipmentResponse updateShipment(Long id, ShipmentRequest request, String shipperEmail);
+    ShipmentResponse updateShipmentStatus(Long shipmentId, ShipmentStatus status, String carrierEmail);
+    void deleteShipment(Long id, String shipperEmail);
 }

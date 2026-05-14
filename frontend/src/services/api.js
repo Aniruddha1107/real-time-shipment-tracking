@@ -102,18 +102,18 @@ export const assignCarrier = (shipmentId, carrierId) =>
     true
   );
 
-export const updateShipmentStatus = (shipmentId, carrierId, status) =>
+export const updateShipmentStatus = (shipmentId, status) =>
   request(
     "PATCH",
     `/api/shipments/${shipmentId}/status`,
-    { carrierId, status },
+    { status },
     true
   );
 
 // ─── NOTIFICATIONS ────────────────────────────
 
-export const getNotifications = (userId) =>
-  request("GET", `/api/notifications/user/${userId}`, null, true);
+export const getNotifications = () =>
+  request("GET", "/api/notifications/me", null, true);
 
 export const markNotificationRead = (notificationId) =>
   request("PUT", `/api/notifications/${notificationId}/read`, null, true);
@@ -123,11 +123,20 @@ export const getTrackingHistory = (shipmentId) =>
   request("GET", `/api/tracking/${shipmentId}`, null, true);
 
 // ─── BIDDING ─────────────────────────────────
-export const placeBid = (shipmentId, carrierId, bidPrice, message = "") =>
-  request("POST", "/api/bids", { shipmentId, carrierId, bidPrice, message }, true);
+export const placeBid = (shipmentId, bidPrice, message = "") =>
+  request("POST", "/api/bids", { shipmentId, bidPrice, message }, true);
 
 export const getBidsByShipment = (shipmentId) =>
   request("GET", `/api/bids/shipment/${shipmentId}`, null, true);
 
 export const acceptLowestBid = (shipmentId) =>
   request("PUT", `/api/bids/shipment/${shipmentId}/accept-lowest`, null, true);
+
+export const acceptBid = (shipmentId, bidId) =>
+  request("PUT", `/api/bids/shipment/${shipmentId}/bids/${bidId}/accept`, null, true);
+
+export const getPublicShipmentTracking = (shipmentId) =>
+  request("GET", `/api/public/tracking/${shipmentId}/shipment`);
+
+export const getPublicTrackingHistory = (shipmentId) =>
+  request("GET", `/api/public/tracking/${shipmentId}/history`);

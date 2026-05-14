@@ -20,6 +20,7 @@ import {
   placeBid, 
   getBidsByShipment, 
   acceptLowestBid,
+  acceptBid,
   updateShipmentStatus
 } from "../services/api";
 import websocketService from "../services/websocket";
@@ -64,12 +65,8 @@ const Dashboard = () => {
       try {
         websocketService.connect(token);
         
-        websocketService.subscribe('/topic/notifications', (msg) => {
-          setNotifications(prev => [{ id: Date.now(), message: msg.message || msg }, ...prev].slice(0, 5));
-        });
-
         if (userId) {
-          websocketService.subscribe(`/topic/notifications/${userId}`, (msg) => {
+          websocketService.subscribe(`/topic/user/${userId}`, (msg) => {
             setNotifications(prev => [{ id: Date.now(), message: msg.message || msg }, ...prev].slice(0, 5));
             // Auto refresh shipments when a bid is accepted or tracking updates
             fetchShipments();
@@ -162,6 +159,7 @@ const Dashboard = () => {
               latitude: currentLat,
               longitude: currentLng,
               locationDesc: `In Transit towards ${activeShipment.destination}...`,
+              eventType: "LOCATION_UPDATE",
               eventTimestamp: new Date().toISOString()
             };
             
@@ -185,7 +183,7 @@ const Dashboard = () => {
     if (!amount) return;
 
     try {
-      await placeBid(shipmentId, userId, amount, "Bid placed from dashboard");
+      await placeBid(shipmentId, amount, "Bid placed from dashboard");
       alert(`Bid of ₹${amount} placed successfully!`);
       setBidInputs(prev => ({ ...prev, [shipmentId]: "" }));
     } catch (err) {
@@ -214,7 +212,19 @@ const Dashboard = () => {
     if (!window.confirm("Accept the lowest bid?")) return;
     try {
       await acceptLowestBid(shipmentId);
-      alert("Lowest bid accepted! Shipment is now AWARDED.");
+      alert("Lowest bid accepted! Shipment is awaiting pickup.");
+      setViewingBidsFor(null);
+      fetchShipments();
+    } catch (err) {
+      alert("Failed to accept bid: " + err.message);
+    }
+  };
+
+  const handleAcceptBid = async (shipmentId, bidId) => {
+    if (!window.confirm("Accept this carrier bid?")) return;
+    try {
+      await acceptBid(shipmentId, bidId);
+      alert("Bid accepted! Shipment is awaiting pickup.");
       setViewingBidsFor(null);
       fetchShipments();
     } catch (err) {
@@ -226,7 +236,7 @@ const Dashboard = () => {
     e.stopPropagation();
     if (!window.confirm("Start this shipment and begin GPS tracking?")) return;
     try {
-      await updateShipmentStatus(shipmentId, userId, "IN_TRANSIT");
+      await updateShipmentStatus(shipmentId, "IN_TRANSIT");
       alert("Shipment started! It is now IN_TRANSIT.");
       fetchShipments();
     } catch (err) {
@@ -238,7 +248,7 @@ const Dashboard = () => {
     e.stopPropagation();
     if (!window.confirm("Mark this shipment as DELIVERED?")) return;
     try {
-      await updateShipmentStatus(shipmentId, userId, "DELIVERED");
+      await updateShipmentStatus(shipmentId, "DELIVERED");
       alert("Shipment Delivered successfully! 🎉");
       if (activeTracking === shipmentId) {
           websocketService.unsubscribe(`/topic/tracking/${shipmentId}`);
@@ -342,7 +352,7 @@ const Dashboard = () => {
                 <div className="card-actions" style={{ marginTop: '1rem' }}>
                   
                   {/* Carrier Bidding Logic */}
-                  {role === "CARRIER" && s.status === "OPEN" && (
+                  {role === "CARRIER" && (s.status === "OPEN" || s.status === "BIDDING") && (
                     <div className="bid-input-group" onClick={e => e.stopPropagation()}>
                       <input 
                         type="number" 
@@ -357,7 +367,7 @@ const Dashboard = () => {
                   )}
 
                   {/* Shipper Bidding Logic */}
-                  {role === "SHIPPER" && s.status === "OPEN" && (
+                  {role === "SHIPPER" && (s.status === "OPEN" || s.status === "BIDDING") && (
                     <button 
                       className="view-bids-btn" 
                       onClick={(e) => loadBids(e, s.shipmentId)}
@@ -367,7 +377,7 @@ const Dashboard = () => {
                   )}
 
                   {/* Tracking Logic */}
-                  {role === "CARRIER" && s.status === "AWARDED" && (
+                  {role === "CARRIER" && s.status === "AWAITING_PICKUP" && String(s.awardedCarrierId) === String(userId) && (
                     <button 
                       className="track-btn" 
                       onClick={(e) => handleStartShipment(e, s.shipmentId)}
@@ -428,6 +438,9 @@ const Dashboard = () => {
                       <div className="bid-amount">₹{bid.bidPrice}</div>
                       <div className="bid-carrier">Carrier ID: {bid.carrierId}</div>
                       <div className="bid-message">"{bid.message || 'No message'}"</div>
+                      <button className="accept-lowest-btn" onClick={() => handleAcceptBid(viewingBidsFor, bid.bidId)}>
+                        Accept Bid
+                      </button>
                     </div>
                   ))
                 ) : (
@@ -484,4 +497,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default Dashboard;

@@ -5,8 +5,9 @@ import com.infotact.rstp.dto.BidResponse;
 import java.util.List;
 
 public interface BidService {
-    BidResponse placeBid(BidRequest request);
-    List<BidResponse> getBidsByShipment(Long shipmentId);
-    List<BidResponse> getBidsByCarrier(Long carrierId);
-    BidResponse acceptLowestBid(Long shipmentId);
+    BidResponse placeBid(BidRequest request, String carrierEmail);
+    List<BidResponse> getBidsByShipment(Long shipmentId, String shipperEmail);
+    List<BidResponse> getBidsByCarrier(String carrierEmail);
+    BidResponse acceptLowestBid(Long shipmentId, String shipperEmail);
+    BidResponse acceptBid(Long shipmentId, Long bidId, String shipperEmail);
 }

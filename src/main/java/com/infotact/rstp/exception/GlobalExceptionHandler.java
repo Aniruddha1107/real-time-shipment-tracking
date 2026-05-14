@@ -8,6 +8,7 @@ import com.infotact.rstp.exception.InvalidShipmentStatusException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -57,6 +58,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleBadCredentials(BadCredentialsException ex) {
         log.warn("Invalid login attempt");
         return buildResponse(HttpStatus.UNAUTHORIZED, "Invalid email or password", null);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
+        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage(), null);
     }
 
     @ExceptionHandler(InvalidShipmentStatusException.class)

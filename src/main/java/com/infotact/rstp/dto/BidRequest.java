@@ -8,7 +8,6 @@ public class BidRequest {
     @NotNull(message = "Shipment ID is required")
 	private Long shipmentId;
 
-	@NotNull(message = "Carrier ID is required")
 	private Long carrierId;
 
 	@NotNull(message = "Bid price is required")

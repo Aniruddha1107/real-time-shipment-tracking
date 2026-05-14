@@ -111,7 +111,7 @@ class TrackingServiceImplTest {
                 .thenReturn(List.of(mockEvent));
 
         // Act
-        List<TrackingEventDTO> history = trackingService.getTrackingHistory(1L);
+        List<TrackingEventDTO> history = trackingService.getPublicTrackingHistory(1L);
 
         // Assert
         assertNotNull(history);
