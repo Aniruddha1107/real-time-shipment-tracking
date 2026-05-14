@@ -103,6 +103,8 @@ const Dashboard = () => {
 
     setActiveTracking(shipmentId);
     setViewingBidsFor(null); // Close bids view when tracking
+
+    const originCoords = getCoordinates(shipment.origin);
     
     // Set origin/dest for map routing
     setTrackingData(prev => ({ 
@@ -110,7 +112,10 @@ const Dashboard = () => {
       [shipmentId]: { 
         ...prev[shipmentId], 
         originStr: shipment.origin, 
-        destStr: shipment.destination 
+        destStr: shipment.destination,
+        latitude: prev[shipmentId]?.latitude ?? originCoords?.[0],
+        longitude: prev[shipmentId]?.longitude ?? originCoords?.[1],
+        locationDesc: prev[shipmentId]?.locationDesc ?? `Awaiting GPS from ${shipment.origin}`
       } 
     }));
 

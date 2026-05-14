@@ -1,18 +1,31 @@
-import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, FeatureGroup } from 'react-leaflet';
+import React, { useEffect, useMemo, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Fix for default marker icons using CDN links
-const defaultIcon = new L.Icon({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
+const makeLabelIcon = (label, color) => L.divIcon({
+    className: '',
+    html: `
+        <div style="
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: ${color};
+            color: white;
+            display: grid;
+            place-items: center;
+            font-weight: 800;
+            border: 3px solid white;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.28);
+        ">${label}</div>
+    `,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -18]
 });
+
+const originIcon = makeLabelIcon('S', '#16a34a');
+const destinationIcon = makeLabelIcon('E', '#dc2626');
 
 // Truck icon for the shipment
 const truckIcon = new L.Icon({
@@ -38,10 +51,34 @@ const MOCK_COORDS = {
     'nampalli': [17.3847, 78.4682]
 };
 
+const INDIA_BOUNDS = {
+    minLat: 8.4,
+    maxLat: 32.5,
+    minLng: 68.7,
+    maxLng: 88.2
+};
+
+const hashText = (text) => {
+    let hash = 0;
+    for (let i = 0; i < text.length; i += 1) {
+        hash = ((hash << 5) - hash) + text.charCodeAt(i);
+        hash |= 0;
+    }
+    return Math.abs(hash);
+};
+
 export const getCoordinates = (cityStr) => {
     if (!cityStr || typeof cityStr !== 'string') return null;
     const key = cityStr.toLowerCase().split(',')[0].trim();
-    return MOCK_COORDS[key] || null;
+    if (MOCK_COORDS[key]) return MOCK_COORDS[key];
+
+    const hash = hashText(key);
+    const latRange = INDIA_BOUNDS.maxLat - INDIA_BOUNDS.minLat;
+    const lngRange = INDIA_BOUNDS.maxLng - INDIA_BOUNDS.minLng;
+    const latitude = INDIA_BOUNDS.minLat + ((hash % 10000) / 10000) * latRange;
+    const longitude = INDIA_BOUNDS.minLng + (((Math.floor(hash / 10000)) % 10000) / 10000) * lngRange;
+
+    return [Number(latitude.toFixed(4)), Number(longitude.toFixed(4))];
 };
 
 function ChangeView({ center, bounds }) {
@@ -57,13 +94,14 @@ function ChangeView({ center, bounds }) {
 }
 
 const TrackingMap = ({ latitude, longitude, locationDesc, originStr, destStr }) => {
-    // Current Live Position
-    const position = latitude && longitude ? [latitude, longitude] : null;
-
-    // Route calculation
-    const originCoords = getCoordinates(originStr);
-    const destCoords = getCoordinates(destStr);
-    const routeCoordinates = originCoords && destCoords ? [originCoords, destCoords] : [];
+    const originCoords = useMemo(() => getCoordinates(originStr), [originStr]);
+    const destCoords = useMemo(() => getCoordinates(destStr), [destStr]);
+    const routeCoordinates = useMemo(
+        () => originCoords && destCoords ? [originCoords, destCoords] : [],
+        [originCoords, destCoords]
+    );
+    const hasLivePosition = latitude !== null && latitude !== undefined && longitude !== null && longitude !== undefined;
+    const position = hasLivePosition ? [Number(latitude), Number(longitude)] : originCoords;
 
     const [osrmRoute, setOsrmRoute] = useState([]);
 
@@ -91,11 +129,10 @@ const TrackingMap = ({ latitude, longitude, locationDesc, originStr, destStr }) 
         } else {
             setOsrmRoute([]);
         }
-    }, [originStr, destStr]);
+    }, [routeCoordinates]);
 
-    // Map Center & Bounds logic
     const mapCenter = position || originCoords || [20.5937, 78.9629];
-    const mapBounds = routeCoordinates.length > 0 && !position ? routeCoordinates : null;
+    const mapBounds = routeCoordinates.length > 0 ? routeCoordinates.concat(position ? [position] : []) : null;
 
     return (
         <MapContainer 
@@ -114,24 +151,23 @@ const TrackingMap = ({ latitude, longitude, locationDesc, originStr, destStr }) 
             {osrmRoute.length > 0 ? <Polyline positions={osrmRoute} color="#6366f1" weight={4} dashArray="10, 10" /> : null}
             
             {routeCoordinates.length === 2 ? (
-                <Marker position={originCoords} icon={defaultIcon}>
-                    <Popup><span>Origin: {originStr}</span></Popup>
+                <Marker position={originCoords} icon={originIcon}>
+                    <Popup><span>Start: {originStr}</span></Popup>
                 </Marker>
             ) : null}
 
             {routeCoordinates.length === 2 ? (
-                <Marker position={destCoords} icon={defaultIcon}>
-                    <Popup><span>Destination: {destStr}</span></Popup>
+                <Marker position={destCoords} icon={destinationIcon}>
+                    <Popup><span>End: {destStr}</span></Popup>
                 </Marker>
             ) : null}
 
-            {/* Draw Live Truck */}
             {position ? (
                 <Marker position={position} icon={truckIcon}>
                     <Popup>
                         <div>
-                            <strong>Live Location</strong> <br />
-                            {locationDesc || 'In Transit'}
+                            <strong>{hasLivePosition ? 'Current Carrier Location' : 'Awaiting GPS at Start Point'}</strong> <br />
+                            {locationDesc || 'Carrier location will update here'}
                         </div>
                     </Popup>
                 </Marker>
